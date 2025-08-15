@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Temperament {
+  calm
+  spirited
+  green
+  steady
+}
+
+enum SlotStatus {
+  open
+  held
+  booked
+  closed
+}
+
+enum BookingStatus {
+  booked
+  completed
+  cancelled
+  no_show
+}
+
+enum OrderStatus {
+  pending
+  paid
+  fulfilled
+  cancelled
+}
+
+enum ProductType {
+  merch
+  digital
+  gift_card
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String?
+  firstName   String
+  lastName    String
+  phone       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  roles       UserRole[]
+  student     Student?
+  guardian    Guardian?
+  instructorSlots AvailabilitySlot[] @relation("InstructorSlots")
+  progressNotes ProgressNote[]
+  mediaAssets MediaAsset[]
+  orders      Order[]
+  formSubmissions FormSubmission[]
+  testimonials Testimonial[] @relation("ApprovedTestimonials")
+
+  @@map("users")
+}
+
+model Role {
+  id    Int       @id @default(autoincrement())
+  key   String    @unique
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String
+  roleId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Student {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  dateOfBirth     DateTime?
+  experienceLevel String?
+  notes           String?
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings        LessonBooking[]
+  packages        StudentPackage[]
+  guardianStudents GuardianStudent[] @relation("StudentGuardians")
+  formSubmissions FormSubmission[]
+
+  @@map("students")
+}
+
+model Guardian {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardianStudents      GuardianStudent[] @relation("GuardianStudents")
+
+  @@map("guardians")
+}
+
+model GuardianStudent {
+  guardianId String
+  studentId  String
+  relationship String?
+  
+  // Relations
+  guardian   Guardian @relation("GuardianStudents", fields: [guardianId], references: [id], onDelete: Cascade)
+  student    Student  @relation("StudentGuardians", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([guardianId, studentId])
+  @@map("guardian_students")
+}
+
+model Horse {
+  id          String       @id @default(uuid())
+  name        String
+  breed       String?
+  dob         DateTime?
+  sex         String?
+  temperament Temperament?
+  weight      Float?
+  height      Float?
+  bio         String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  slots       AvailabilitySlot[]
+
+  @@map("horses")
+}
+
+model LessonType {
+  id              String  @id @default(uuid())
+  name            String
+  durationMinutes Int
+  priceCents      Int
+  maxStudents     Int      @default(1)
+  requiresHorse   Boolean  @default(true)
+
+  // Relations
+  templates       LessonBlockTemplate[]
+  slots           AvailabilitySlot[]
+  packages        StudentPackage[]
+
+  @@map("lesson_types")
+}
+
+model LessonBlockTemplate {
+  id            String      @id @default(uuid())
+  instructorId  String?
+  weekday       Int
+  startTime     DateTime
+  durationMins  Int
+  capacity      Int          @default(1)
+  lessonTypeId  String
+  
+  // Relations
+  lessonType    LessonType   @relation(fields: [lessonTypeId], references: [id])
+
+  @@map("lesson_block_templates")
+}
+
+model AvailabilitySlot {
+  id           String     @id @default(uuid())
+  date         DateTime
+  startTime    DateTime
+  endTime      DateTime
+  instructorId String?
+  lessonTypeId String
+  capacity     Int        @default(1)
+  horseId      String?
+  status       SlotStatus @default(open)
+
+  // Relations
+  lessonType   LessonType @relation(fields: [lessonTypeId], references: [id])
+  instructor   User?      @relation("InstructorSlots", fields: [instructorId], references: [id])
+  horse        Horse?     @relation(fields: [horseId], references: [id])
+  bookings     LessonBooking[]
+
+  @@unique([date, startTime, instructorId])
+  @@map("availability_slots")
+}
+
+model LessonBooking {
+  id          String        @id @default(uuid())
+  slotId      String
+  studentId   String
+  status      BookingStatus @default(booked)
+  paymentSource String
+  stripePaymentId String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+
+  // Relations
+  slot        AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  progressNotes ProgressNote[]
+
+  @@map("lesson_bookings")
+}
+
+model ProgressNote {
+  id          String   @id @default(uuid())
+  lessonBookingId String
+  instructorId String
+  rating      Int?
+  skillsJson  Json?
+  noteText    String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  lessonBooking LessonBooking @relation(fields: [lessonBookingId], references: [id], onDelete: Cascade)
+  instructor    User          @relation(fields: [instructorId], references: [id])
+
+  @@map("progress_notes")
+}
+
+model StudentPackage {
+  id               String   @id @default(uuid())
+  studentId        String
+  lessonTypeId     String
+  lessonsIncluded  Int
+  remainingLessons Int
+  expiresAt        DateTime?
+  stripePaymentId  String?
+  status           String
+  createdAt        DateTime @default(now())
+
+  // Relations
+  student          Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lessonType       LessonType  @relation(fields: [lessonTypeId], references: [id])
+
+  @@map("student_packages")
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  slug        String      @unique
+  type        ProductType
+  priceCents  Int
+  stockQty    Int?
+  description String
+  media       String[]
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  userId           String
+  status           OrderStatus @default(pending)
+  subtotalCents    Int
+  taxCents         Int
+  shippingCents    Int
+  totalCents       Int
+  stripeCheckoutId String?
+  createdAt        DateTime    @default(now())
+
+  // Relations
+  user             User        @relation(fields: [userId], references: [id])
+  orderItems       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String @id @default(uuid())
+  orderId    String
+  productId  String
+  quantity   Int
+  unitPriceCents Int
+  metaJson   Json?
+
+  // Relations
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model MediaAsset {
+  id          String   @id @default(uuid())
+  ownerUserId String?
+  kind        String
+  url         String
+  altText     String?
+  source      String
+  publishedAt DateTime @default(now())
+
+  // Relations
+  owner       User?    @relation(fields: [ownerUserId], references: [id])
+
+  @@map("media_assets")
+}
+
+model Testimonial {
+  id              String   @id @default(uuid())
+  authorName      String
+  photoUrl        String?
+  quote           String
+  approvedByUserId String?
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  approvedBy      User?    @relation("ApprovedTestimonials", fields: [approvedByUserId], references: [id])
+
+  @@map("testimonials")
+}
+
+model FormTemplate {
+  id           String @id @default(uuid())
+  key          String @unique
+  title        String
+  schemaJson   Json
+  renderVersion Int   @default(1)
+  createdAt    DateTime @default(now())
+
+  // Relations
+  submissions  FormSubmission[]
+
+  @@map("form_templates")
+}
+
+model FormSubmission {
+  id            String    @id @default(uuid())
+  formTemplateId String
+  userId        String?
+  studentId     String?
+  dataJson      Json
+  signedPdfUrl  String?
+  signatureBlob String?
+  signedAt      DateTime?
+  ipAddress     String
+  createdAt     DateTime  @default(now())
+
+  // Relations
+  formTemplate  FormTemplate @relation(fields: [formTemplateId], references: [id])
+  user          User?        @relation(fields: [userId], references: [id])
+  student       Student?     @relation(fields: [studentId], references: [id])
+
+  @@map("form_submissions")
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  location    String?
+  startAt     DateTime
+  endAt       DateTime
+  capacity    Int?
+  priceCents  Int?
+  createdAt   DateTime  @default(now())
+
+  @@map("events")
+}
+
+model WebhookEvent {
+  id        String   @id @default(uuid())
+  provider  String
+  eventId   String
+  type      String
+  payloadJson Json
+  processedAt DateTime?
+  status    String   @default("pending")
+  retries   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("webhook_events")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  action       String
+  targetTable  String
+  targetId     String?
+  diffJson     Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@map("audit_logs")
+}
