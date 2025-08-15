@@ -10,6 +10,9 @@ dotenv.config();
 
 // Import routes
 import publicRoutes from './routes/public';
+import authRoutes from './routes/auth';
+import studentRoutes from './routes/student';
+import adminRoutes from './routes/admin';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -61,6 +64,9 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/v1/public', publicRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/student', studentRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

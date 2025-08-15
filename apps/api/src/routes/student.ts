@@ -1,101 +1,36 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { authenticateToken, requireStudent } from '../middleware/auth';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma';
-import { createError } from '../middleware/errorHandler';
-import { AuthRequest } from '../middleware/auth';
 
+const prisma = new PrismaClient();
 const router = express.Router();
 
-// Get student profile
-router.get('/profile', async (req: AuthRequest, res, next) => {
+// Apply authentication middleware to all student routes
+router.use(authenticateToken);
+router.use(requireStudent);
+
+// Get available lesson slots
+router.get('/slots', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
-
-    const student = await prisma.student.findUnique({
-      where: { userId: req.user.id },
-      include: {
-        user: true,
-        guardianStudents: {
-          include: {
-            guardian: {
-              include: {
-                user: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!student) {
-      throw createError('Student profile not found', 404);
-    }
-
-    res.json({
-      data: student
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Update student profile
-router.put('/profile', async (req: AuthRequest, res, next) => {
-  try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
-
-    const { firstName, lastName, phone, experienceLevel, notes } = req.body;
-
-    const student = await prisma.student.update({
-      where: { userId: req.user.id },
-      data: {
-        experienceLevel,
-        notes,
-        user: {
-          update: {
-            firstName,
-            lastName,
-            phone
-          }
-        }
-      },
-      include: {
-        user: true
-      }
-    });
-
-    res.json({
-      data: student
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get available slots for booking
-router.get('/slots', async (req: AuthRequest, res, next) => {
-  try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
-
-    const { from, to, lessonTypeId } = req.query;
-
+    const { date, lessonTypeId } = req.query;
+    
     const where: any = {
       status: 'open',
-      date: {}
+      capacity: { gt: 0 }
     };
 
-    if (from) {
-      where.date.gte = new Date(from as string);
+    if (date) {
+      const startDate = new Date(date as string);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 1);
+      
+      where.date = {
+        gte: startDate,
+        lt: endDate
+      };
     }
-    if (to) {
-      where.date.lte = new Date(to as string);
-    }
+
     if (lessonTypeId) {
       where.lessonTypeId = lessonTypeId;
     }
@@ -104,6 +39,7 @@ router.get('/slots', async (req: AuthRequest, res, next) => {
       where,
       include: {
         lessonType: true,
+        horse: true,
         instructor: {
           select: {
             id: true,
@@ -111,158 +47,119 @@ router.get('/slots', async (req: AuthRequest, res, next) => {
             lastName: true
           }
         },
-        horse: {
+        bookings: {
           select: {
-            id: true,
-            name: true,
-            breed: true
+            id: true
           }
         }
       },
-      orderBy: [
-        { date: 'asc' },
-        { startTime: 'asc' }
-      ]
+      orderBy: {
+        date: 'asc'
+      }
     });
 
+    // Calculate remaining capacity
+    const slotsWithCapacity = slots.map(slot => ({
+      ...slot,
+      remainingCapacity: slot.capacity - slot.bookings.length
+    }));
+
     res.json({
-      data: slots
+      data: slotsWithCapacity
     });
+
   } catch (error) {
-    next(error);
+    console.error('Get slots error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Book a lesson
-router.post('/bookings', async (req: AuthRequest, res, next) => {
+router.post('/bookings', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
+    const { slotId, notes } = req.body;
+    const studentId = req.user!.userId;
+
+    // Validate input
+    if (!slotId) {
+      return res.status(400).json({ error: 'Slot ID is required' });
     }
 
-    const { slotId, paymentSource, notes } = req.body;
-
-    // Get student
-    const student = await prisma.student.findUnique({
-      where: { userId: req.user.id }
-    });
-
-    if (!student) {
-      throw createError('Student profile not found', 404);
-    }
-
-    // Check if slot is available
+    // Check if slot exists and is available
     const slot = await prisma.availabilitySlot.findUnique({
       where: { id: slotId },
       include: {
-        lessonType: true
+        bookings: true
       }
     });
 
-    if (!slot || slot.status !== 'open') {
-      throw createError('Slot not available', 400);
+    if (!slot) {
+      return res.status(404).json({ error: 'Slot not found' });
     }
 
-    // If using package, check if student has available lessons
-    if (paymentSource === 'package') {
-      const studentPackage = await prisma.studentPackage.findFirst({
-        where: {
-          studentId: student.id,
-          lessonTypeId: slot.lessonTypeId,
-          status: 'active',
-          remainingLessons: { gt: 0 },
-          expiresAt: { gt: new Date() }
-        }
-      });
+    if (slot.status !== 'open') {
+      return res.status(400).json({ error: 'Slot is not available' });
+    }
 
-      if (!studentPackage) {
-        throw createError('No available lesson package found', 400);
+    if (slot.bookings.length >= slot.capacity) {
+      return res.status(400).json({ error: 'Slot is full' });
+    }
+
+    // Check if student already has a booking for this slot
+    const existingBooking = await prisma.lessonBooking.findFirst({
+      where: {
+        slotId,
+        studentId
       }
+    });
 
-      // Create booking and update package
-      const [booking] = await prisma.$transaction([
-        prisma.lessonBooking.create({
-          data: {
-            slotId,
-            studentId: student.id,
-            paymentSource: 'package',
-            notes
-          },
+    if (existingBooking) {
+      return res.status(400).json({ error: 'You already have a booking for this slot' });
+    }
+
+    // Create booking
+    const booking = await prisma.lessonBooking.create({
+      data: {
+        studentId,
+        slotId,
+        notes,
+        status: 'booked',
+        paymentSource: 'package' // Default to package for now
+      },
+      include: {
+        slot: {
           include: {
-            slot: {
-              include: {
-                lessonType: true,
-                instructor: true
+            lessonType: true,
+            horse: true,
+            instructor: {
+              select: {
+                firstName: true,
+                lastName: true
               }
             }
           }
-        }),
-        prisma.studentPackage.update({
-          where: { id: studentPackage.id },
-          data: { remainingLessons: { decrement: 1 } }
-        }),
-        prisma.availabilitySlot.update({
-          where: { id: slotId },
-          data: { status: 'booked' }
-        })
-      ]);
-
-      res.json({
-        data: booking
-      });
-    } else {
-      // Single lesson purchase - create booking with held status
-      const booking = await prisma.lessonBooking.create({
-        data: {
-          slotId,
-          studentId: student.id,
-          paymentSource: 'single',
-          notes
-        },
-        include: {
-          slot: {
-            include: {
-              lessonType: true,
-              instructor: true
-            }
-          }
         }
-      });
+      }
+    });
 
-      // Update slot to held status
-      await prisma.availabilitySlot.update({
-        where: { id: slotId },
-        data: { status: 'held' }
-      });
+    res.status(201).json({
+      message: 'Lesson booked successfully',
+      data: booking
+    });
 
-      res.json({
-        data: booking
-      });
-    }
   } catch (error) {
-    next(error);
+    console.error('Book lesson error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get student's bookings
-router.get('/bookings', async (req: AuthRequest, res, next) => {
+router.get('/bookings', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
+    const studentId = req.user!.userId;
+    const { status } = req.query;
 
-    const { status, page = 1, limit = 20 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const student = await prisma.student.findUnique({
-      where: { userId: req.user.id }
-    });
-
-    if (!student) {
-      throw createError('Student profile not found', 404);
-    }
-
-    const where: any = { studentId: student.id };
+    const where: any = { studentId };
     if (status) {
       where.status = status;
     }
@@ -273,17 +170,11 @@ router.get('/bookings', async (req: AuthRequest, res, next) => {
         slot: {
           include: {
             lessonType: true,
+            horse: true,
             instructor: {
               select: {
-                id: true,
                 firstName: true,
                 lastName: true
-              }
-            },
-            horse: {
-              select: {
-                id: true,
-                name: true
               }
             }
           }
@@ -299,133 +190,176 @@ router.get('/bookings', async (req: AuthRequest, res, next) => {
           }
         }
       },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: Number(limit)
-    });
-
-    const total = await prisma.lessonBooking.count({ where });
-
-    res.json({
-      data: bookings,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        totalPages: Math.ceil(total / Number(limit))
+      orderBy: {
+        slot: {
+          date: 'asc'
+        }
       }
     });
+
+    res.json({
+      data: bookings
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Get bookings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Cancel a booking
-router.patch('/bookings/:id/cancel', async (req: AuthRequest, res, next) => {
+router.patch('/bookings/:bookingId/cancel', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
-
-    const { id } = req.params;
-
-    const student = await prisma.student.findUnique({
-      where: { userId: req.user.id }
-    });
-
-    if (!student) {
-      throw createError('Student profile not found', 404);
-    }
+    const { bookingId } = req.params;
+    const studentId = req.user!.userId;
 
     const booking = await prisma.lessonBooking.findFirst({
       where: {
-        id,
-        studentId: student.id
-      },
-      include: {
-        slot: true
+        id: bookingId,
+        studentId
       }
     });
 
     if (!booking) {
-      throw createError('Booking not found', 404);
+      return res.status(404).json({ error: 'Booking not found' });
     }
 
     if (booking.status !== 'booked') {
-      throw createError('Cannot cancel this booking', 400);
+      return res.status(400).json({ error: 'Booking cannot be cancelled' });
     }
 
-    // Check if it's within cancellation window (e.g., 24 hours)
-    const lessonDate = new Date(booking.slot.date);
-    const now = new Date();
-    const hoursUntilLesson = (lessonDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilLesson < 24) {
-      throw createError('Cannot cancel within 24 hours of lesson', 400);
-    }
-
-    // Cancel booking and update slot
-    const [updatedBooking] = await prisma.$transaction([
-      prisma.lessonBooking.update({
-        where: { id },
-        data: { status: 'cancelled' }
-      }),
-      prisma.availabilitySlot.update({
-        where: { id: booking.slotId },
-        data: { status: 'open' }
-      })
-    ]);
-
-    // If it was a package booking, refund the lesson
-    if (booking.paymentSource === 'package') {
-      await prisma.studentPackage.updateMany({
-        where: {
-          studentId: student.id,
-          lessonTypeId: booking.slot.lessonTypeId,
-          status: 'active'
-        },
-        data: {
-          remainingLessons: { increment: 1 }
-        }
-      });
-    }
+    // Update booking status
+    await prisma.lessonBooking.update({
+      where: { id: bookingId },
+      data: { status: 'cancelled' }
+    });
 
     res.json({
-      data: updatedBooking
+      message: 'Booking cancelled successfully'
     });
+
   } catch (error) {
-    next(error);
+    console.error('Cancel booking error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get student's packages
-router.get('/packages', async (req: AuthRequest, res, next) => {
+router.get('/packages', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      throw createError('User not authenticated', 401);
-    }
-
-    const student = await prisma.student.findUnique({
-      where: { userId: req.user.id }
-    });
-
-    if (!student) {
-      throw createError('Student profile not found', 404);
-    }
+    const studentId = req.user!.userId;
 
     const packages = await prisma.studentPackage.findMany({
-      where: { studentId: student.id },
+      where: { studentId },
       include: {
         lessonType: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
 
     res.json({
       data: packages
     });
+
   } catch (error) {
-    next(error);
+    console.error('Get packages error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get student's progress
+router.get('/progress', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.user!.userId;
+
+    const progressNotes = await prisma.progressNote.findMany({
+      where: {
+        lessonBooking: {
+          studentId
+        }
+      },
+      include: {
+        lessonBooking: {
+          include: {
+            slot: {
+              include: {
+                lessonType: true,
+                horse: true
+              }
+            }
+          }
+        },
+        instructor: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({
+      data: progressNotes
+    });
+
+  } catch (error) {
+    console.error('Get progress error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get student profile
+router.get('/profile', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.user!.userId;
+
+    const student = await prisma.student.findUnique({
+      where: { userId: studentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true
+          }
+        },
+        guardianStudents: {
+          include: {
+            guardian: {
+              include: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!student) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    res.json({
+      data: student
+    });
+
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

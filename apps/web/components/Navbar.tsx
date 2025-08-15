@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, User, Settings } from "lucide-react";
+import { Menu, X, User, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-butter-300">
@@ -54,12 +56,33 @@ export default function Navbar() {
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/portal/student" className="btn btn-primary">
-              Student Portal
-            </Link>
-            <Link href="/portal/admin" className="btn btn-outline">
-              Admin
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <div className="flex items-center gap-2 text-sm text-barn-700">
+                  <User className="w-4 h-4" />
+                  <span>Welcome, {user?.firstName}</span>
+                </div>
+                <Link href="/portal/student" className="btn btn-primary">
+                  Student Portal
+                </Link>
+                <button 
+                  onClick={logout}
+                  className="btn btn-outline flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="btn btn-outline">
+                  Login
+                </Link>
+                <Link href="/register" className="btn btn-primary">
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -131,20 +154,48 @@ export default function Navbar() {
               </li>
             </ul>
             <div className="flex flex-col gap-3 mt-6">
-              <Link 
-                href="/portal/student" 
-                className="btn btn-primary text-center"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Student Portal
-              </Link>
-              <Link 
-                href="/portal/admin" 
-                className="btn btn-outline text-center"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Admin
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-barn-700 px-4 py-2">
+                    <User className="w-4 h-4" />
+                    <span>Welcome, {user?.firstName}</span>
+                  </div>
+                  <Link 
+                    href="/portal/student" 
+                    className="btn btn-primary text-center"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Student Portal
+                  </Link>
+                  <button 
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="btn btn-outline text-center flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link 
+                    href="/login" 
+                    className="btn btn-outline text-center"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link 
+                    href="/register" 
+                    className="btn btn-primary text-center"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
