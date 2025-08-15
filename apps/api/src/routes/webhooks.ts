@@ -31,7 +31,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       provider: 'stripe',
       eventId: event.id,
       type: event.type,
-      payloadJson: event.data.object,
+      payloadJson: JSON.parse(JSON.stringify(event.data.object)),
     }
   });
 

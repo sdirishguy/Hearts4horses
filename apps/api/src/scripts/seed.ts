@@ -58,10 +58,8 @@ async function main() {
   ];
 
   for (const lessonType of lessonTypes) {
-    await prisma.lessonType.upsert({
-      where: { name: lessonType.name },
-      update: lessonType,
-      create: lessonType
+    await prisma.lessonType.create({
+      data: lessonType
     });
   }
 
@@ -116,10 +114,8 @@ async function main() {
   ];
 
   for (const horse of horses) {
-    await prisma.horse.upsert({
-      where: { name: horse.name },
-      update: horse,
-      create: horse
+    await prisma.horse.create({
+      data: horse
     });
   }
 
