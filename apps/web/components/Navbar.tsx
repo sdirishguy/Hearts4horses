@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, userType, isAuthenticated, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-butter-300">
@@ -58,13 +58,24 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <div className="flex items-center gap-2 text-sm text-barn-700">
-                  <User className="w-4 h-4" />
-                  <span>Welcome, {user?.firstName}</span>
-                </div>
-                <Link href="/portal/student" className="btn btn-primary">
-                  Student Portal
-                </Link>
+                {userType === 'student' && (
+                  <Link href="/portal/student" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
+                    <User className="w-4 h-4" />
+                    <span>{user?.firstName}</span>
+                  </Link>
+                )}
+                {userType === 'instructor' && (
+                  <Link href="/portal/instructor" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
+                    <User className="w-4 h-4" />
+                    <span>{user?.firstName}</span>
+                  </Link>
+                )}
+                {userType === 'admin' && (
+                  <Link href="/portal/admin" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
+                    <User className="w-4 h-4" />
+                    <span>{user?.firstName}</span>
+                  </Link>
+                )}
                 <button 
                   onClick={logout}
                   className="btn btn-outline flex items-center gap-2"
@@ -156,17 +167,36 @@ export default function Navbar() {
             <div className="flex flex-col gap-3 mt-6">
               {isAuthenticated ? (
                 <>
-                  <div className="flex items-center gap-2 text-sm text-barn-700 px-4 py-2">
-                    <User className="w-4 h-4" />
-                    <span>Welcome, {user?.firstName}</span>
-                  </div>
-                  <Link 
-                    href="/portal/student" 
-                    className="btn btn-primary text-center"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Student Portal
-                  </Link>
+                  {userType === 'student' && (
+                    <Link 
+                      href="/portal/student" 
+                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>{user?.firstName}</span>
+                    </Link>
+                  )}
+                  {userType === 'instructor' && (
+                    <Link 
+                      href="/portal/instructor" 
+                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>{user?.firstName}</span>
+                    </Link>
+                  )}
+                  {userType === 'admin' && (
+                    <Link 
+                      href="/portal/admin" 
+                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>{user?.firstName}</span>
+                    </Link>
+                  )}
                   <button 
                     onClick={() => {
                       logout();

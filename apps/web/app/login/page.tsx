@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,8 +16,21 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuth();
+  const { login, userType, isAuthenticated } = useAuth();
   const router = useRouter();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && userType) {
+      if (userType === 'student') {
+        window.location.href = '/portal/student';
+      } else if (userType === 'instructor') {
+        window.location.href = '/portal/instructor';
+      } else if (userType === 'admin') {
+        window.location.href = '/portal/admin';
+      }
+    }
+  }, [isAuthenticated, userType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +39,9 @@ export default function LoginPage() {
 
     try {
       await login(formData);
-      router.push('/portal/student');
+      // The redirect will be handled by the useEffect above
     } catch (error: any) {
+      console.error('Login error:', error);
       setError(error.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);

@@ -363,4 +363,171 @@ router.get('/profile', async (req: Request, res: Response) => {
   }
 });
 
+// Get available lesson types
+router.get('/lesson-types', async (req: Request, res: Response) => {
+  try {
+    const lessonTypes = await prisma.lessonType.findMany({
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    res.json({
+      data: lessonTypes
+    });
+
+  } catch (error) {
+    console.error('Get lesson types error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get available packages for purchase
+router.get('/packages/available', async (req: Request, res: Response) => {
+  try {
+    const packages = await prisma.product.findMany({
+      where: {
+        type: 'merch',
+        isActive: true
+      },
+      orderBy: {
+        priceCents: 'asc'
+      }
+    });
+
+    res.json({
+      data: packages
+    });
+
+  } catch (error) {
+    console.error('Get available packages error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Purchase a package
+router.post('/packages/purchase', async (req: Request, res: Response) => {
+  try {
+    const { packageId, paymentSource } = req.body;
+    const studentId = req.user!.userId;
+
+    // Validate input
+    if (!packageId) {
+      return res.status(400).json({ error: 'Package ID is required' });
+    }
+
+    // Get the package details
+    const product = await prisma.product.findUnique({
+      where: { id: packageId }
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Package not found' });
+    }
+
+    // Create student package
+    const studentPackage = await prisma.studentPackage.create({
+      data: {
+        studentId,
+        lessonTypeId: packageId, // Using lessonTypeId as a placeholder
+        lessonsIncluded: 5, // Default value
+        remainingLessons: 5, // Default value
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        status: 'active',
+        stripePaymentId: null
+      }
+    });
+
+    res.status(201).json({
+      message: 'Package purchased successfully',
+      data: studentPackage
+    });
+
+  } catch (error) {
+    console.error('Purchase package error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get progress statistics
+router.get('/progress/stats', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.user!.userId;
+
+    // Get total lessons
+    const totalLessons = await prisma.lessonBooking.count({
+      where: { studentId }
+    });
+
+    // Get completed lessons
+    const completedLessons = await prisma.lessonBooking.count({
+      where: {
+        studentId,
+        status: 'completed'
+      }
+    });
+
+    // Get average rating from progress notes
+    const progressNotes = await prisma.progressNote.findMany({
+      where: {
+        lessonBooking: {
+          studentId
+        }
+      },
+      select: {
+        rating: true,
+        skillsJson: true,
+        noteText: true
+      }
+    });
+
+    const averageRating = progressNotes.length > 0 
+      ? progressNotes.reduce((sum, note) => sum + (note.rating || 0), 0) / progressNotes.length
+      : 0;
+
+    // Extract skills mastered from skillsJson (simplified for now)
+    const skillsMastered = new Set<string>();
+    progressNotes.forEach(note => {
+      if (note.skillsJson && typeof note.skillsJson === 'object') {
+        // Parse skills from JSON if available
+        const skills = note.skillsJson as any;
+        if (skills.strengths && Array.isArray(skills.strengths)) {
+          skills.strengths.forEach((skill: string) => skillsMastered.add(skill));
+        }
+      }
+    });
+
+    // Get current focus from most recent progress note
+    const latestProgressNote = await prisma.progressNote.findFirst({
+      where: {
+        lessonBooking: {
+          studentId
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      select: {
+        noteText: true
+      }
+    });
+
+    const stats = {
+      totalLessons,
+      completedLessons,
+      averageRating,
+      skillsMastered: Array.from(skillsMastered),
+      currentFocus: latestProgressNote?.noteText || null
+    };
+
+    res.json({
+      data: stats
+    });
+
+  } catch (error) {
+    console.error('Get progress stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

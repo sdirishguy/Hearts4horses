@@ -125,8 +125,24 @@ export const studentAPI = {
     return response.data;
   },
 
+  // Get available slots (alias for getSlots)
+  getAvailableSlots: async (params?: { date?: string; lessonTypeId?: string }) => {
+    const response = await api.get('/student/slots', { params });
+    return response.data;
+  },
+
   // Book a lesson
-  bookLesson: async (data: { slotId: string; notes?: string }) => {
+  bookLesson: async (data: { 
+    slotId: string; 
+    lessonTypeId: string;
+    horseId: string;
+    instructorId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    paymentSource: string;
+    notes?: string 
+  }) => {
     const response = await api.post('/student/bookings', data);
     return response.data;
   },
@@ -149,9 +165,33 @@ export const studentAPI = {
     return response.data;
   },
 
+  // Get available packages for purchase
+  getAvailablePackages: async () => {
+    const response = await api.get('/student/packages/available');
+    return response.data;
+  },
+
+  // Purchase a package
+  purchasePackage: async (data: { packageId: string; paymentSource: string }) => {
+    const response = await api.post('/student/packages/purchase', data);
+    return response.data;
+  },
+
   // Get student's progress
   getProgress: async () => {
     const response = await api.get('/student/progress');
+    return response.data;
+  },
+
+  // Get progress statistics
+  getProgressStats: async () => {
+    const response = await api.get('/student/progress/stats');
+    return response.data;
+  },
+
+  // Get lesson types
+  getLessonTypes: async () => {
+    const response = await api.get('/student/lesson-types');
     return response.data;
   },
 };
