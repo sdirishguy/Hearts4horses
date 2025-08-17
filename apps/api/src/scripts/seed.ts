@@ -232,6 +232,45 @@ async function main() {
     });
   }
 
+  // Create sample users
+  console.log('Creating sample users...');
+  const bcrypt = require('bcryptjs');
+  
+  const users = [
+    {
+      email: 'admin@hearts4horses.com',
+      password: await bcrypt.hash('admin123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      userType: 'admin' as const,
+      isActive: true
+    },
+    {
+      email: 'student@example.com',
+      password: await bcrypt.hash('password123', 10),
+      firstName: 'John',
+      lastName: 'Student',
+      userType: 'student' as const,
+      isActive: true
+    },
+    {
+      email: 'guardian@example.com',
+      password: await bcrypt.hash('password123', 10),
+      firstName: 'Jane',
+      lastName: 'Guardian',
+      userType: 'guardian' as const,
+      isActive: true
+    }
+  ];
+
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: user,
+      create: user
+    });
+  }
+
   console.log('✅ Database seed completed successfully!');
 }
 

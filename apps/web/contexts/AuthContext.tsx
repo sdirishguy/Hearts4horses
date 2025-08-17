@@ -71,6 +71,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const response: AuthResponse = await authAPI.login(data);
       
+      console.log('AuthContext: Login response:', response);
+      console.log('AuthContext: userType from response:', response.userType);
+      
       // Store token and user data
       tokenUtils.setToken(response.token);
       userUtils.setUser(response.user, response.userType);
@@ -78,6 +81,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Update state
       setUser(response.user);
       setUserType(response.userType);
+      
+      console.log('AuthContext: State updated - userType:', response.userType);
     } catch (error) {
       console.error('AuthContext: Login error:', error);
       throw error;

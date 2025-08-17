@@ -19,9 +19,14 @@ export default function LoginPage() {
   const { login, userType, isAuthenticated } = useAuth();
   const router = useRouter();
 
+  // Test if the component is working
+  console.log('LoginPage component rendered');
+
   // Redirect if already authenticated
   useEffect(() => {
+    console.log('Login page: isAuthenticated:', isAuthenticated, 'userType:', userType);
     if (isAuthenticated && userType) {
+      console.log('Login page: Redirecting user with type:', userType);
       if (userType === 'student') {
         window.location.href = '/portal/student';
       } else if (userType === 'instructor') {
@@ -34,14 +39,19 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    alert('Form submitted!'); // Temporary debug alert
     setError('');
     setIsLoading(true);
 
+    console.log('Login form: Submitting with data:', formData);
+
     try {
+      console.log('Login form: Calling login function...');
       await login(formData);
+      console.log('Login form: Login function completed successfully');
       // The redirect will be handled by the useEffect above
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Login form: Login error:', error);
       setError(error.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);

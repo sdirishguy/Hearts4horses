@@ -22,7 +22,7 @@ router.get('/horses', async (req: Request, res: Response) => {
     });
 
     res.json({
-      data: horses
+      horses: horses
     });
 
   } catch (error) {
@@ -97,6 +97,63 @@ router.put('/horses/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Update horse status (PATCH for partial updates)
+router.patch('/horses/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const horse = await prisma.horse.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json({
+      message: 'Horse updated successfully',
+      data: horse
+    });
+
+  } catch (error) {
+    console.error('Update horse error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update horse (PUT for full updates)
+router.put('/horses/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, breed, dob, sex, temperament, weight, height, bio } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Horse name is required' });
+    }
+
+    const horse = await prisma.horse.update({
+      where: { id },
+      data: {
+        name,
+        breed,
+        dob: dob ? new Date(dob) : null,
+        sex,
+        temperament,
+        weight: weight ? parseFloat(weight) : null,
+        height: height ? parseFloat(height) : null,
+        bio
+      }
+    });
+
+    res.json({
+      message: 'Horse updated successfully',
+      data: horse
+    });
+
+  } catch (error) {
+    console.error('Update horse error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Delete horse
 router.delete('/horses/:id', async (req: Request, res: Response) => {
   try {
@@ -130,7 +187,9 @@ router.get('/students', async (req: Request, res: Response) => {
             firstName: true,
             lastName: true,
             phone: true,
-            isActive: true
+            isActive: true,
+            createdAt: true,
+            updatedAt: true
           }
         },
         guardianStudents: {
@@ -170,12 +229,68 @@ router.get('/students', async (req: Request, res: Response) => {
       }
     });
 
+    // Transform the data to flatten the user properties
+    const transformedStudents = students.map(student => ({
+      id: student.id,
+      firstName: student.user.firstName,
+      lastName: student.user.lastName,
+      email: student.user.email,
+      phone: student.user.phone,
+      userType: 'student' as const,
+      isActive: student.user.isActive,
+      createdAt: student.user.createdAt.toISOString(),
+      updatedAt: student.user.updatedAt.toISOString(),
+      totalLessons: student.bookings.length,
+      lastLessonDate: student.bookings.length > 0 ? student.bookings[0].createdAt.toISOString() : undefined
+    }));
+
     res.json({
-      data: students
+      students: transformedStudents
     });
 
   } catch (error) {
     console.error('Get students error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update student status (PATCH for partial updates)
+router.patch('/students/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Update the user's isActive status
+    const student = await prisma.student.update({
+      where: { id },
+      data: {
+        user: {
+          update: {
+            isActive: updateData.isActive
+          }
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            isActive: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Student updated successfully',
+      data: student
+    });
+
+  } catch (error) {
+    console.error('Update student error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -352,11 +467,16 @@ router.post('/slots', async (req: Request, res: Response) => {
       });
     }
 
+    // Create proper DateTime objects for time fields
+    const slotDate = new Date(date);
+    const startDateTime = new Date(`${date}T${startTime}`);
+    const endDateTime = new Date(`${date}T${endTime}`);
+
     const slot = await prisma.availabilitySlot.create({
       data: {
-        date: new Date(date),
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
+        date: slotDate,
+        startTime: startDateTime,
+        endTime: endDateTime,
         instructorId,
         lessonTypeId,
         capacity: capacity || 1,
@@ -464,6 +584,101 @@ router.delete('/slots/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Get availability slots
+router.get('/slots', async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query;
+    
+    let whereClause: any = {};
+    if (date) {
+      whereClause.date = new Date(date as string);
+    }
+
+    const slots = await prisma.availabilitySlot.findMany({
+      where: whereClause,
+      include: {
+        lessonType: true,
+        horse: true,
+        instructor: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        },
+        bookings: {
+          include: {
+            student: {
+              include: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        date: 'asc',
+        startTime: 'asc'
+      }
+    });
+
+    res.json({
+      slots: slots
+    });
+
+  } catch (error) {
+    console.error('Get slots error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create availability slot
+router.post('/slots', async (req: Request, res: Response) => {
+  try {
+    const { date, startTime, endTime, lessonTypeId, capacity, status } = req.body;
+
+    if (!date || !startTime || !endTime) {
+      return res.status(400).json({ 
+        error: 'Date, start time, and end time are required' 
+      });
+    }
+
+    const slot = await prisma.availabilitySlot.create({
+      data: {
+        date: new Date(date),
+        startTime: new Date(`2000-01-01T${startTime}`),
+        endTime: new Date(`2000-01-01T${endTime}`),
+        lessonTypeId: lessonTypeId || null,
+        capacity: capacity || 1,
+        status: status || 'open'
+      },
+      include: {
+        lessonType: true,
+        horse: true,
+        instructor: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: 'Slot created successfully',
+      data: slot
+    });
+
+  } catch (error) {
+    console.error('Create slot error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get lesson types
 router.get('/lesson-types', async (req: Request, res: Response) => {
   try {
@@ -474,7 +689,7 @@ router.get('/lesson-types', async (req: Request, res: Response) => {
     });
 
     res.json({
-      data: lessonTypes
+      lessonTypes: lessonTypes
     });
 
   } catch (error) {
@@ -511,6 +726,219 @@ router.post('/lesson-types', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Create lesson type error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Advanced Calendar System
+
+// Get calendar settings
+router.get('/calendar-settings', async (req: Request, res: Response) => {
+  try {
+    // For now, return default settings
+    // In a real app, you'd store these in the database
+    const settings = {
+      workingDays: [1, 2, 3, 4, 5], // Monday-Friday
+      startTime: "08:00",
+      endTime: "18:00",
+      timeIncrement: 30,
+      timeSlots: []
+    };
+
+    res.json({
+      settings: settings
+    });
+
+  } catch (error) {
+    console.error('Get calendar settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update calendar settings
+router.put('/calendar-settings', async (req: Request, res: Response) => {
+  try {
+    const { workingDays, startTime, endTime, timeIncrement } = req.body;
+
+    // In a real app, you'd save these to the database
+    const settings = {
+      workingDays: workingDays || [1, 2, 3, 4, 5],
+      startTime: startTime || "08:00",
+      endTime: endTime || "18:00",
+      timeIncrement: timeIncrement || 30,
+      timeSlots: []
+    };
+
+    res.json({
+      message: 'Settings updated successfully',
+      settings: settings
+    });
+
+  } catch (error) {
+    console.error('Update calendar settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get calendar events
+router.get('/calendar-events', async (req: Request, res: Response) => {
+  try {
+    // For now, return sample events to demonstrate functionality
+    // In a real app, you'd fetch from a calendar_events table
+    const events: any[] = [
+      {
+        id: 'event_1',
+        title: 'Sarah Johnson - Beginner Riding',
+        description: 'Beginner riding lesson with safety considerations',
+        startTime: '09:00',
+        endTime: '10:00',
+        date: new Date().toISOString().split('T')[0],
+        type: 'lesson',
+        blocksTime: true,
+        reminderTime: '08:45',
+        isReminderShown: false,
+        student: {
+          id: 'student_1',
+          firstName: 'Sarah',
+          lastName: 'Johnson',
+          safetyCriteria: ['wheelchair', 'anxiety']
+        },
+        lessonType: {
+          id: 'lesson_1',
+          name: 'Beginner Riding',
+          durationMinutes: 60,
+          priceCents: 7500,
+          maxStudents: 1
+        },
+        horseName: 'Gentle Spirit',
+        instructorName: 'Mike Wilson',
+        safetyCriteria: ['wheelchair', 'anxiety']
+      },
+      {
+        id: 'event_2',
+        title: 'Alex Chen - Advanced Riding',
+        description: 'Advanced riding lesson',
+        startTime: '14:00',
+        endTime: '15:30',
+        date: new Date().toISOString().split('T')[0],
+        type: 'lesson',
+        blocksTime: true,
+        reminderTime: '13:45',
+        isReminderShown: false,
+        student: {
+          id: 'student_2',
+          firstName: 'Alex',
+          lastName: 'Chen',
+          safetyCriteria: ['vision']
+        },
+        lessonType: {
+          id: 'lesson_2',
+          name: 'Advanced Riding',
+          durationMinutes: 90,
+          priceCents: 12000,
+          maxStudents: 1
+        },
+        horseName: 'Thunder',
+        instructorName: 'Lisa Rodriguez',
+        safetyCriteria: ['vision']
+      },
+      {
+        id: 'event_3',
+        title: 'Staff Meeting',
+        description: 'Weekly staff coordination',
+        startTime: '16:00',
+        endTime: '17:00',
+        date: new Date().toISOString().split('T')[0],
+        type: 'reminder',
+        blocksTime: false,
+        reminderTime: '15:55',
+        isReminderShown: false
+      }
+    ];
+
+    res.json({
+      events: events
+    });
+
+  } catch (error) {
+    console.error('Get calendar events error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create calendar event
+router.post('/calendar-events', async (req: Request, res: Response) => {
+  try {
+    const { title, description, startTime, endTime, date, type, blocksTime, reminderTime } = req.body;
+
+    if (!title || !startTime || !endTime || !date) {
+      return res.status(400).json({ 
+        error: 'Title, start time, end time, and date are required' 
+      });
+    }
+
+    // In a real app, you'd save this to a calendar_events table
+    const event = {
+      id: `event_${Date.now()}`,
+      title,
+      description,
+      startTime,
+      endTime,
+      date,
+      type: type || 'event',
+      blocksTime: blocksTime !== false,
+      reminderTime,
+      isReminderShown: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    res.status(201).json({
+      message: 'Event created successfully',
+      data: event
+    });
+
+  } catch (error) {
+    console.error('Create calendar event error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update calendar event
+router.put('/calendar-events/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, description, startTime, endTime, date, type, blocksTime, reminderTime } = req.body;
+
+    if (!title || !startTime || !endTime || !date) {
+      return res.status(400).json({ 
+        error: 'Title, start time, end time, and date are required' 
+      });
+    }
+
+    // In a real app, you'd update this in a calendar_events table
+    const event = {
+      id,
+      title,
+      description,
+      startTime,
+      endTime,
+      date,
+      type: type || 'event',
+      blocksTime: blocksTime !== false,
+      reminderTime,
+      isReminderShown: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    res.json({
+      message: 'Event updated successfully',
+      data: event
+    });
+
+  } catch (error) {
+    console.error('Update calendar event error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -96,9 +96,7 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  // For now, we'll consider instructors as admins
-  // Later we can add a proper admin role
-  if (req.user.userType !== 'instructor') {
+  if (req.user.userType !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
   }
 

@@ -113,12 +113,17 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const validatedData = loginSchema.parse(req.body);
     
-    // Find user
+    // Find user with roles
     const user = await prisma.user.findUnique({
       where: { email: validatedData.email },
       include: {
         student: true,
         guardian: true,
+        roles: {
+          include: {
+            role: true
+          }
+        }
       }
     });
 
@@ -137,10 +142,14 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Determine user type
+    // Determine user type from roles
     let userType = 'user';
-    if (user.student) userType = 'student';
-    else if (user.guardian) userType = 'guardian';
+    const roleKeys = user.roles.map(userRole => userRole.role.key);
+    
+    if (roleKeys.includes('admin')) userType = 'admin';
+    else if (roleKeys.includes('student')) userType = 'student';
+    else if (roleKeys.includes('guardian')) userType = 'guardian';
+    else if (roleKeys.includes('instructor')) userType = 'instructor';
 
     // Generate JWT token
     const token = jwt.sign(
@@ -194,6 +203,11 @@ router.get('/me', async (req: Request, res: Response) => {
       include: {
         student: true,
         guardian: true,
+        roles: {
+          include: {
+            role: true
+          }
+        }
       }
     });
 
@@ -201,10 +215,14 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    // Determine user type
+    // Determine user type from roles
     let userType = 'user';
-    if (user.student) userType = 'student';
-    else if (user.guardian) userType = 'guardian';
+    const roleKeys = user.roles.map(userRole => userRole.role.key);
+    
+    if (roleKeys.includes('admin')) userType = 'admin';
+    else if (roleKeys.includes('student')) userType = 'student';
+    else if (roleKeys.includes('guardian')) userType = 'guardian';
+    else if (roleKeys.includes('instructor')) userType = 'instructor';
 
     const { password, ...userWithoutPassword } = user;
     

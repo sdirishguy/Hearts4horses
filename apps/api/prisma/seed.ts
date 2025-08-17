@@ -152,11 +152,105 @@ async function main() {
     })
   ]);
 
+  // Create roles first
+  const roles = await Promise.all([
+    prisma.role.upsert({
+      where: { key: 'admin' },
+      update: {},
+      create: { key: 'admin' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'student' },
+      update: {},
+      create: { key: 'student' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'guardian' },
+      update: {},
+      create: { key: 'guardian' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'instructor' },
+      update: {},
+      create: { key: 'instructor' }
+    })
+  ]);
+
+  // Create sample users
+  const bcrypt = require('bcryptjs');
+  
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@hearts4horses.com' },
+    update: {},
+    create: {
+      email: 'admin@hearts4horses.com',
+      password: await bcrypt.hash('admin123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      isActive: true
+    }
+  });
+
+  const studentUser = await prisma.user.upsert({
+    where: { email: 'student@example.com' },
+    update: {},
+    create: {
+      email: 'student@example.com',
+      password: await bcrypt.hash('password123', 10),
+      firstName: 'John',
+      lastName: 'Student',
+      isActive: true
+    }
+  });
+
+  const guardianUser = await prisma.user.upsert({
+    where: { email: 'guardian@example.com' },
+    update: {},
+    create: {
+      email: 'guardian@example.com',
+      password: await bcrypt.hash('password123', 10),
+      firstName: 'Jane',
+      lastName: 'Guardian',
+      isActive: true
+    }
+  });
+
+  // Assign roles to users
+  await Promise.all([
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId: adminUser.id, roleId: roles[0].id } },
+      update: {},
+      create: {
+        userId: adminUser.id,
+        roleId: roles[0].id // admin role
+      }
+    }),
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId: studentUser.id, roleId: roles[1].id } },
+      update: {},
+      create: {
+        userId: studentUser.id,
+        roleId: roles[1].id // student role
+      }
+    }),
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId: guardianUser.id, roleId: roles[2].id } },
+      update: {},
+      create: {
+        userId: guardianUser.id,
+        roleId: roles[2].id // guardian role
+      }
+    })
+  ]);
+
+  const users = [adminUser, studentUser, guardianUser];
+
   console.log('✅ Database seeded successfully!');
   console.log(`Created ${lessonTypes.length} lesson types`);
   console.log(`Created ${products.length} products`);
   console.log(`Created ${horses.length} horses`);
   console.log(`Created ${slots.length} availability slots`);
+  console.log(`Created ${users.length} users`);
 }
 
 main()
