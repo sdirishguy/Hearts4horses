@@ -1,5 +1,5 @@
-const WEATHERSTACK_API_KEY = process.env.NEXT_PUBLIC_WEATHERSTACK_API_KEY;
-const WEATHERSTACK_BASE_URL = 'http://api.weatherstack.com';
+const WEATHERAPI_KEY = process.env.NEXT_PUBLIC_WEATHERAPI_KEY;
+const WEATHERAPI_BASE_URL = 'https://api.weatherapi.com/v1';
 
 export interface WeatherData {
   temperature: string;
@@ -24,7 +24,7 @@ export const weatherAPI = {
   // Get current weather for a location
   getCurrentWeather: async (location: string = 'Hearts4Horses Equestrian Center'): Promise<WeatherData> => {
     try {
-      if (!WEATHERSTACK_API_KEY) {
+      if (!WEATHERAPI_KEY) {
         // Fallback to mock data if no API key
         return {
           temperature: '72°F',
@@ -37,7 +37,7 @@ export const weatherAPI = {
       }
 
       const response = await fetch(
-        `${WEATHERSTACK_BASE_URL}/current?access_key=${WEATHERSTACK_API_KEY}&query=${encodeURIComponent(location)}&units=f`
+        `${WEATHERAPI_BASE_URL}/current.json?key=${WEATHERAPI_KEY}&q=${encodeURIComponent(location)}&aqi=no`
       );
 
       if (!response.ok) {
@@ -47,17 +47,17 @@ export const weatherAPI = {
       const data = await response.json();
 
       if (data.error) {
-        throw new Error(data.error.info || 'Weather API error');
+        throw new Error(data.error.message || 'Weather API error');
       }
 
       return {
-        temperature: `${data.current.temperature}°F`,
-        condition: data.current.weather_descriptions[0] || 'Unknown',
+        temperature: `${data.current.temp_f}°F`,
+        condition: data.current.condition.text,
         location: data.location.name,
         humidity: `${data.current.humidity}%`,
-        windSpeed: `${data.current.wind_speed} mph`,
-        feelsLike: `${data.current.feelslike}°F`,
-        icon: data.current.weather_icons?.[0]
+        windSpeed: `${data.current.wind_mph} mph`,
+        feelsLike: `${data.current.feelslike_f}°F`,
+        icon: data.current.condition.icon
       };
     } catch (error) {
       console.error('Weather API error:', error);
@@ -76,7 +76,7 @@ export const weatherAPI = {
   // Get weather forecast for a location
   getForecast: async (location: string = 'Hearts4Horses Equestrian Center', days: number = 3): Promise<WeatherForecast[]> => {
     try {
-      if (!WEATHERSTACK_API_KEY) {
+      if (!WEATHERAPI_KEY) {
         // Fallback to mock data if no API key
         return [
           {
@@ -101,7 +101,7 @@ export const weatherAPI = {
       }
 
       const response = await fetch(
-        `${WEATHERSTACK_BASE_URL}/forecast?access_key=${WEATHERSTACK_API_KEY}&query=${encodeURIComponent(location)}&units=f&forecast_days=${days}`
+        `${WEATHERAPI_BASE_URL}/forecast.json?key=${WEATHERAPI_KEY}&q=${encodeURIComponent(location)}&days=${days}&aqi=no&alerts=no`
       );
 
       if (!response.ok) {
@@ -111,13 +111,13 @@ export const weatherAPI = {
       const data = await response.json();
 
       if (data.error) {
-        throw new Error(data.error.info || 'Weather forecast API error');
+        throw new Error(data.error.message || 'Weather forecast API error');
       }
 
       return data.forecast?.forecastday?.slice(0, days).map((day: any) => ({
         date: day.date,
-        high: `${day.maxtemp_f}°F`,
-        low: `${day.mintemp_f}°F`,
+        high: `${day.day.maxtemp_f}°F`,
+        low: `${day.day.mintemp_f}°F`,
         condition: day.day.condition.text,
         icon: day.day.condition.icon
       })) || [];

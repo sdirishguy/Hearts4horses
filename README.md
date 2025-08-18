@@ -136,7 +136,11 @@ OPENWEATHER_API_KEY="your-api-key"
 
 #### Frontend (.env.local in apps/web/)
 ```bash
+# API Configuration
 NEXT_PUBLIC_API_URL="http://localhost:4000"
+
+# Weather API (WeatherAPI.com - HTTPS endpoint)
+NEXT_PUBLIC_WEATHERAPI_KEY="your-weatherapi-key-here"
 ```
 
 ### 4. Set Up Database
