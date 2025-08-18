@@ -1,9 +1,7 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireStudent } from '../middleware/auth';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 const router = express.Router();
 
 // Apply authentication middleware to all student routes

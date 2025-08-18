@@ -3,16 +3,16 @@ import { useState, useEffect } from "react";
 import { Check, Star } from "lucide-react";
 import Link from "next/link";
 import { LessonType } from "@/lib/types";
+import { apiClient } from "@/lib/api";
 
 export default function PricingTable() {
   const [lessonTypes, setLessonTypes] = useState<LessonType[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:4000/api/v1/public/services`)
-      .then(res => res.json())
-      .then(data => {
-        setLessonTypes(data.data || []);
+    apiClient.public.services()
+      .then(response => {
+        setLessonTypes(response.data.data || []);
         setLoading(false);
       })
       .catch(() => {

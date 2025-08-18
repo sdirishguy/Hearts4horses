@@ -2,9 +2,7 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 const router = express.Router();
 
 // Validation schemas
@@ -103,7 +101,7 @@ router.post('/register', async (req: Request, res: Response) => {
         email: user.email,
         userType: validatedData.userType 
       },
-      process.env.JWT_SECRET || 'fallback-secret',
+      process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
 
@@ -203,7 +201,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         userType 
       },
-      process.env.JWT_SECRET || 'fallback-secret',
+      process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
 
@@ -246,7 +244,7 @@ router.get('/me', async (req: Request, res: Response) => {
 
     const token = authHeader.substring(7);
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

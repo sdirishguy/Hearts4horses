@@ -14,10 +14,17 @@
     "start": "npm run start --workspace=apps/api",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
-    "db:seed": "npm run db:seed --workspace=apps/api"
+    "db:seed": "npm run db:seed --workspace=apps/api",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces",
+    "format": "npm run format --workspaces",
+    "type-check": "npm run type-check --workspaces"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.0",
+    "lint-staged": "^15.2.0",
+    "husky": "^8.0.3"
   },
   "engines": {
     "node": ">=18.0.0"

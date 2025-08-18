@@ -48,7 +48,17 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
 });
+
+// Stricter rate limiting for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 auth requests per windowMs
+  message: 'Too many authentication attempts from this IP, please try again later.',
+  skipSuccessfulRequests: true, // Don't count successful requests
+});
+
 app.use('/api/', limiter);
+app.use('/api/v1/auth', authLimiter);
 
 // Body parsing middleware
 app.use(compression());

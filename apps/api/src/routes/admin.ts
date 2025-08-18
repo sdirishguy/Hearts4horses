@@ -1,8 +1,6 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 const router = express.Router();
 
 // Apply authentication middleware to all admin routes

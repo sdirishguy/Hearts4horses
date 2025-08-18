@@ -14,6 +14,17 @@ export const errorHandler = (
   const statusCode = error.statusCode || 500;
   const message = error.message || 'Internal Server Error';
 
+  // Sanitize sensitive data before logging
+  const sanitizeBody = (body: any) => {
+    if (!body) return body;
+    const sanitized = { ...body };
+    // Remove sensitive fields
+    if (sanitized.password) sanitized.password = '***';
+    if (sanitized.token) sanitized.token = '***';
+    if (sanitized.confirmPassword) sanitized.confirmPassword = '***';
+    return sanitized;
+  };
+
   // Log error in development
   if (process.env.NODE_ENV === 'development') {
     console.error('Error:', {
@@ -21,7 +32,7 @@ export const errorHandler = (
       stack: error.stack,
       url: req.url,
       method: req.method,
-      body: req.body,
+      body: sanitizeBody(req.body),
       params: req.params,
       query: req.query,
     });

@@ -65,6 +65,30 @@ A comprehensive equestrian training and lesson management platform built with Ne
 - **Twilio** - SMS notifications
 - **Mailchimp** - Email marketing
 
+## Security Considerations
+
+### 🔒 Critical Security Measures
+- **Environment Variables**: Never commit `.env` files. Use `.env.example` as templates.
+- **JWT Secrets**: Use strong, unique JWT secrets. Never use fallback secrets.
+- **Database Credentials**: Rotate database passwords regularly.
+- **API Keys**: Store sensitive API keys server-side only.
+- **Rate Limiting**: Auth routes are rate-limited to prevent brute force attacks.
+- **CORS**: Configured to allow only trusted origins.
+- **Input Validation**: All inputs validated with Zod schemas.
+- **Error Logging**: Sensitive data is sanitized before logging.
+
+### 🛡️ Authentication & Authorization
+- JWT tokens with secure configuration
+- Role-based access control (RBAC)
+- Server-side route protection
+- Middleware guards for sensitive endpoints
+
+### 🔐 Data Protection
+- Password hashing with bcrypt
+- HTTPS enforcement in production
+- Secure cookie configuration
+- Input sanitization and validation
+
 ## Quick Start
 
 ### Prerequisites
