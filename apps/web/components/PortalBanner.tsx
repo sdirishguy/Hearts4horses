@@ -15,29 +15,11 @@ export default function PortalBanner() {
   }
 
   const getPortalPath = () => {
-    switch (userType) {
-      case 'student':
-        return '/portal/student';
-      case 'instructor':
-        return '/portal/instructor';
-      case 'admin':
-        return '/portal/admin';
-      default:
-        return '/portal/student';
-    }
+    return '/portal/user';
   };
 
   const getPortalName = () => {
-    switch (userType) {
-      case 'student':
-        return 'Student Portal';
-      case 'instructor':
-        return 'Instructor Portal';
-      case 'admin':
-        return 'Admin Portal';
-      default:
-        return 'Portal';
-    }
+    return 'User Portal';
   };
 
   return (

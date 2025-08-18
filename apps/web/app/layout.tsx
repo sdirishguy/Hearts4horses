@@ -7,15 +7,15 @@ import PortalBanner from '@/components/PortalBanner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Hearts4Horses - Equestrian Training & Lessons',
+  title: 'Hearts4Horses Equestrian Center - Equestrian Training & Lessons',
   description: 'Professional horse riding lessons, camps, and equestrian training for all ages and skill levels. Located in a beautiful, safe environment with experienced instructors.',
   keywords: 'horse riding lessons, equestrian training, horse camps, riding instructor, horseback riding, equestrian center',
-  authors: [{ name: 'Hearts4Horses' }],
+  authors: [{ name: 'Hearts4Horses Equestrian Center' }],
   openGraph: {
-    title: 'Hearts4Horses - Equestrian Training & Lessons',
+    title: 'Hearts4Horses Equestrian Center - Equestrian Training & Lessons',
     description: 'Professional horse riding lessons, camps, and equestrian training for all ages and skill levels.',
     url: 'https://hearts4horses.com',
-    siteName: 'Hearts4Horses',
+    siteName: 'Hearts4Horses Equestrian Center',
     images: [
       {
         url: '/og-image.jpg',
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hearts4Horses - Equestrian Training & Lessons',
+    title: 'Hearts4Horses Equestrian Center - Equestrian Training & Lessons',
     description: 'Professional horse riding lessons, camps, and equestrian training for all ages and skill levels.',
     images: ['/og-image.jpg'],
   },

@@ -64,6 +64,14 @@ export default function AdminDashboard() {
       stats: '156 Upcoming Lessons'
     },
     {
+      title: 'Announcements',
+      description: 'Create and manage announcements for all users',
+      icon: BookOpen,
+      href: '/portal/admin/announcements',
+      color: 'bg-yellow-500',
+      stats: 'Manage Content'
+    },
+    {
       title: 'Lesson Types',
       description: 'Configure lesson types, pricing, and requirements',
       icon: BookOpen,

@@ -17,7 +17,7 @@ export default function Navbar() {
             <div className="w-10 h-10 bg-barn-900 rounded-full flex items-center justify-center">
               <span className="text-butter-300 font-bold text-lg">H4H</span>
             </div>
-            <div className="text-barn-900 font-bold text-xl">Hearts4Horses</div>
+            <div className="text-barn-900 font-bold text-xl">Hearts4Horses Equestrian Center</div>
           </Link>
 
           {/* Desktop Navigation */}
@@ -58,24 +58,10 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                {userType === 'student' && (
-                  <Link href="/portal/student" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
-                    <User className="w-4 h-4" />
-                    <span>{user?.firstName}</span>
-                  </Link>
-                )}
-                {userType === 'instructor' && (
-                  <Link href="/portal/instructor" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
-                    <User className="w-4 h-4" />
-                    <span>{user?.firstName}</span>
-                  </Link>
-                )}
-                {userType === 'admin' && (
-                  <Link href="/portal/admin" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
-                    <User className="w-4 h-4" />
-                    <span>{user?.firstName}</span>
-                  </Link>
-                )}
+                <Link href="/portal/user" className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors">
+                  <User className="w-4 h-4" />
+                  <span>{user?.firstName}</span>
+                </Link>
                 <button 
                   onClick={logout}
                   className="btn btn-outline flex items-center gap-2"
@@ -167,36 +153,14 @@ export default function Navbar() {
             <div className="flex flex-col gap-3 mt-6">
               {isAuthenticated ? (
                 <>
-                  {userType === 'student' && (
-                    <Link 
-                      href="/portal/student" 
-                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      <span>{user?.firstName}</span>
-                    </Link>
-                  )}
-                  {userType === 'instructor' && (
-                    <Link 
-                      href="/portal/instructor" 
-                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      <span>{user?.firstName}</span>
-                    </Link>
-                  )}
-                  {userType === 'admin' && (
-                    <Link 
-                      href="/portal/admin" 
-                      className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      <span>{user?.firstName}</span>
-                    </Link>
-                  )}
+                  <Link 
+                    href="/portal/user" 
+                    className="flex items-center gap-2 text-sm font-medium text-barn-700 hover:text-barn-900 transition-colors px-4 py-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="w-4 h-4" />
+                    <span>{user?.firstName}</span>
+                  </Link>
                   <button 
                     onClick={() => {
                       logout();

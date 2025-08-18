@@ -67,7 +67,7 @@ export default function StudentPortalPage() {
                 <div className="w-8 h-8 bg-barn-900 rounded-full flex items-center justify-center">
                   <span className="text-butter-300 font-bold text-sm">H4H</span>
                 </div>
-                <span className="text-barn-900 font-bold">Hearts4Horses</span>
+                <span className="text-barn-900 font-bold">Hearts4Horses Equestrian Center</span>
               </Link>
               <div className="h-6 w-px bg-butter-300"></div>
               <h1 className="text-xl font-semibold text-barn-900">Student Portal</h1>

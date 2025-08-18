@@ -112,7 +112,7 @@ export default function GalleryPage() {
                 Moments That Matter
               </h2>
               <p className="text-lg text-barn-700 mb-6">
-                Our gallery showcases the joy, learning, and beautiful moments that happen every day at Hearts4Horses. From first-time riders to advanced training, each photo tells a story of growth and connection.
+                Our gallery showcases the joy, learning, and beautiful moments that happen every day at Hearts4Horses Equestrian Center. From first-time riders to advanced training, each photo tells a story of growth and connection.
               </p>
               <p className="text-lg text-barn-700 mb-6">
                 We believe in capturing not just the riding, but the relationships, the learning, and the pure joy that comes from working with these magnificent animals.

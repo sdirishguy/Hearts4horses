@@ -8,11 +8,21 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Validate required environment variables
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
+
 // Import routes
 import publicRoutes from './routes/public';
 import authRoutes from './routes/auth';
 import studentRoutes from './routes/student';
 import adminRoutes from './routes/admin';
+import userRoutes from './routes/user';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -67,6 +77,7 @@ app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/student', studentRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/user', userRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

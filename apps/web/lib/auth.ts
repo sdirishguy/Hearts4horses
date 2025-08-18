@@ -58,11 +58,18 @@ export interface Student {
   guardianStudents: any[];
 }
 
+export interface UserRole {
+  id: number;
+  key: string;
+  name: string;
+}
+
 export interface AuthResponse {
   message: string;
   user: User;
   token: string;
   userType: string;
+  roles: UserRole[];
 }
 
 export interface LoginData {
@@ -96,7 +103,7 @@ export const authAPI = {
   },
 
   // Get current user
-  getCurrentUser: async (): Promise<{ user: User; userType: string }> => {
+  getCurrentUser: async (): Promise<{ user: User; userType: string; roles: UserRole[] }> => {
     const response = await api.get('/auth/me');
     return response.data;
   },
@@ -248,10 +255,13 @@ export const tokenUtils = {
 
 // User management utilities
 export const userUtils = {
-  setUser: (user: User, userType: string) => {
+  setUser: (user: User, userType: string, roles?: any[]) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('userType', userType);
+      if (roles) {
+        localStorage.setItem('userRoles', JSON.stringify(roles));
+      }
     }
   },
 
@@ -270,10 +280,19 @@ export const userUtils = {
     return null;
   },
 
+  getUserRoles: (): any[] => {
+    if (typeof window !== 'undefined') {
+      const rolesStr = localStorage.getItem('userRoles');
+      return rolesStr ? JSON.parse(rolesStr) : [];
+    }
+    return [];
+  },
+
   removeUser: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('user');
       localStorage.removeItem('userType');
+      localStorage.removeItem('userRoles');
     }
   },
 };

@@ -27,7 +27,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     const token = authHeader.substring(7);
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
     // Verify user still exists in database
     const user = await prisma.user.findUnique({
@@ -102,3 +102,6 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
 
   next();
 };
+
+// General authentication middleware (alias for authenticateToken)
+export const requireAuth = authenticateToken;

@@ -10,16 +10,10 @@ import Footer from "@/components/Footer";
 export default function HomePage() {
   const { userType, isAuthenticated } = useAuth();
 
-  // Redirect authenticated users to their appropriate portal
+  // Redirect authenticated users to the unified portal
   useEffect(() => {
     if (isAuthenticated && userType) {
-      if (userType === 'student') {
-        window.location.href = '/portal/student';
-      } else if (userType === 'instructor') {
-        window.location.href = '/portal/instructor';
-      } else if (userType === 'admin') {
-        window.location.href = '/portal/admin';
-      }
+      window.location.href = '/portal/user';
     }
   }, [isAuthenticated, userType]);
 

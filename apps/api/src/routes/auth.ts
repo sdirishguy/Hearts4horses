@@ -74,6 +74,28 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
+    // Assign role to user based on userType
+    const roleKey = validatedData.userType;
+    const role = await prisma.role.findUnique({
+      where: { key: roleKey }
+    });
+
+    if (role) {
+      await prisma.userRole.upsert({
+        where: {
+          userId_roleId: {
+            userId: user.id,
+            roleId: role.id
+          }
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          roleId: role.id
+        }
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -88,11 +110,28 @@ router.post('/register', async (req: Request, res: Response) => {
     // Return user data (without password) and token
     const { password, ...userWithoutPassword } = user;
     
+    // Get user with roles for response
+    const userWithRoles = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
     res.status(201).json({
       message: 'User registered successfully',
       user: userWithoutPassword,
       token,
-      userType: validatedData.userType
+      userType: validatedData.userType,
+      roles: userWithRoles?.roles.map(userRole => ({
+        id: userRole.role.id,
+        key: userRole.role.key,
+        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
+      })) || []
     });
 
   } catch (error) {
@@ -150,6 +189,12 @@ router.post('/login', async (req: Request, res: Response) => {
     else if (roleKeys.includes('student')) userType = 'student';
     else if (roleKeys.includes('guardian')) userType = 'guardian';
     else if (roleKeys.includes('instructor')) userType = 'instructor';
+    else {
+      // If user has no roles, return an error
+      return res.status(401).json({ 
+        error: 'User account not properly configured. Please contact support.' 
+      });
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -169,7 +214,12 @@ router.post('/login', async (req: Request, res: Response) => {
       message: 'Login successful',
       user: userWithoutPassword,
       token,
-      userType
+      userType,
+      roles: user.roles.map(userRole => ({
+        id: userRole.role.id,
+        key: userRole.role.key,
+        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
+      }))
     });
 
   } catch (error) {
@@ -223,12 +273,23 @@ router.get('/me', async (req: Request, res: Response) => {
     else if (roleKeys.includes('student')) userType = 'student';
     else if (roleKeys.includes('guardian')) userType = 'guardian';
     else if (roleKeys.includes('instructor')) userType = 'instructor';
+    else {
+      // If user has no roles, return an error
+      return res.status(401).json({ 
+        error: 'User account not properly configured. Please contact support.' 
+      });
+    }
 
     const { password, ...userWithoutPassword } = user;
     
     res.json({
       user: userWithoutPassword,
-      userType
+      userType,
+      roles: user.roles.map(userRole => ({
+        id: userRole.role.id,
+        key: userRole.role.key,
+        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
+      }))
     });
 
   } catch (error) {

@@ -16,9 +16,9 @@ export default function AboutPage() {
         
         <div className="relative mx-auto max-w-6xl px-4 py-16 md:py-24">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-barn-900 leading-tight mb-6">
-              About Hearts4Horses
-            </h1>
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-barn-900 leading-tight mb-6">
+          About Hearts4Horses Equestrian Center
+        </h1>
             <p className="text-xl md:text-2xl text-barn-700 max-w-3xl mx-auto">
               Where passion meets purpose, and every rider finds their perfect partner.
             </p>
@@ -35,7 +35,7 @@ export default function AboutPage() {
                 Our Mission
               </h2>
               <p className="text-lg text-barn-700 mb-6">
-                At Hearts4Horses, we believe that horseback riding is more than just a sport—it's a transformative experience that builds confidence, character, and connection. Our mission is to provide safe, professional, and inspiring equestrian education for riders of all ages and skill levels.
+                At Hearts4Horses Equestrian Center, we believe that horseback riding is more than just a sport—it's a transformative experience that builds confidence, character, and connection. Our mission is to provide safe, professional, and inspiring equestrian education for riders of all ages and skill levels.
               </p>
               <p className="text-lg text-barn-700 mb-6">
                 We're committed to fostering a love for horses while teaching proper horsemanship, riding skills, and the values of responsibility, patience, and respect for these magnificent animals.
@@ -145,7 +145,7 @@ export default function AboutPage() {
               Our Values
             </h2>
             <p className="text-lg text-barn-700 max-w-2xl mx-auto">
-              These core principles guide everything we do at Hearts4Horses.
+              These core principles guide everything we do at Hearts4Horses Equestrian Center.
             </p>
           </div>
 
@@ -192,7 +192,7 @@ export default function AboutPage() {
                 Visit Our Facility
               </h2>
               <p className="text-lg text-barn-700 mb-8">
-                Come experience the magic of Hearts4Horses for yourself. We'd love to show you around our beautiful facility and introduce you to our amazing horses.
+                Come experience the magic of Hearts4Horses Equestrian Center for yourself. We'd love to show you around our beautiful facility and introduce you to our amazing horses.
               </p>
               
               <div className="space-y-4">

@@ -44,6 +44,8 @@ router.get('/services', async (req: Request, res: Response) => {
       name: 'Private Lesson (30 min)',
       durationMinutes: 30,
       priceCents: 4500,
+      maxStudents: 1,
+      requiresHorse: true,
       description: 'One-on-one instruction with a certified instructor'
     },
     {
@@ -51,6 +53,8 @@ router.get('/services', async (req: Request, res: Response) => {
       name: 'Private Lesson (60 min)',
       durationMinutes: 60,
       priceCents: 7500,
+      maxStudents: 1,
+      requiresHorse: true,
       description: 'Extended one-on-one instruction for more advanced training'
     },
     {
@@ -58,6 +62,8 @@ router.get('/services', async (req: Request, res: Response) => {
       name: 'Group Lesson (60 min)',
       durationMinutes: 60,
       priceCents: 5500,
+      maxStudents: 4,
+      requiresHorse: true,
       description: 'Group instruction with 2-4 students of similar skill level'
     },
     {
@@ -65,6 +71,8 @@ router.get('/services', async (req: Request, res: Response) => {
       name: 'Summer Camp (Full Day)',
       durationMinutes: 480,
       priceCents: 15000,
+      maxStudents: 8,
+      requiresHorse: true,
       description: 'Full day camp including riding, horse care, and activities'
     }
   ];

@@ -62,6 +62,9 @@ model User {
   orders      Order[]
   formSubmissions FormSubmission[]
   testimonials Testimonial[] @relation("ApprovedTestimonials")
+  notifications Notification[]
+  announcements Announcement[]
+  userAnnouncements UserNotification[]
 
   @@map("users")
 }
@@ -406,4 +409,55 @@ model AuditLog {
   createdAt    DateTime @default(now())
 
   @@map("audit_logs")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  content     String
+  type        String   // 'lesson_reminder', 'package_expiry', 'announcement', 'system'
+  priority    String   @default("medium") // 'low', 'medium', 'high'
+  isRead      Boolean  @default(false)
+  dataJson    Json?    // Additional data like lessonId, packageId, etc.
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+  authorId    String
+  priority    String   @default("medium") // 'low', 'medium', 'high'
+  isPublished Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  author      User     @relation(fields: [authorId], references: [id])
+  userNotifications UserNotification[]
+
+  @@map("announcements")
+}
+
+model UserNotification {
+  userId         String
+  announcementId String
+  isRead         Boolean  @default(false)
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, announcementId])
+  @@map("user_announcements")
 }

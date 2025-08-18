@@ -26,14 +26,8 @@ export default function LoginPage() {
   useEffect(() => {
     console.log('Login page: isAuthenticated:', isAuthenticated, 'userType:', userType);
     if (isAuthenticated && userType) {
-      console.log('Login page: Redirecting user with type:', userType);
-      if (userType === 'student') {
-        window.location.href = '/portal/student';
-      } else if (userType === 'instructor') {
-        window.location.href = '/portal/instructor';
-      } else if (userType === 'admin') {
-        window.location.href = '/portal/admin';
-      }
+      console.log('Login page: Redirecting user to unified portal');
+      window.location.href = '/portal/user';
     }
   }, [isAuthenticated, userType]);
 
@@ -74,7 +68,7 @@ export default function LoginPage() {
             Welcome Back
           </h2>
           <p className="mt-2 text-barn-700">
-            Sign in to your Hearts4Horses account
+            Sign in to your Hearts4Horses Equestrian Center account
           </p>
         </div>
 

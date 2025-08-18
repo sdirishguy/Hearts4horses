@@ -12,7 +12,7 @@ export default function Footer() {
               <div className="w-10 h-10 bg-butter-300 rounded-full flex items-center justify-center">
                 <span className="text-barn-900 font-bold text-lg">H4H</span>
               </div>
-              <div className="text-butter-300 font-bold text-xl">Hearts4Horses</div>
+              <div className="text-butter-300 font-bold text-xl">Hearts4Horses Equestrian Center</div>
             </div>
             <p className="text-butter-300/80 mb-6 max-w-md">
               Professional equestrian training and riding lessons for all ages and skill levels. 
@@ -106,7 +106,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-butter-300/20 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-butter-300/60 text-sm">
-            © 2024 Hearts4Horses. All rights reserved.
+            © 2024 Hearts4Horses Equestrian Center. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm">
             <Link href="/privacy" className="text-butter-300/60 hover:text-butter-300 transition-colors">

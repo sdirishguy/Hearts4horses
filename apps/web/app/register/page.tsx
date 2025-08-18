@@ -30,10 +30,18 @@ export default function RegisterPage() {
     setError('');
     setIsLoading(true);
 
+    console.log('Registration: Starting registration process...');
+    console.log('Registration: Form data:', formData);
+
     try {
+      console.log('Registration: Calling register function...');
       await register(formData);
-      router.push('/portal/student');
+      console.log('Registration: Register function completed successfully');
+      console.log('Registration: Redirecting to /portal/user...');
+      router.push('/portal/user');
     } catch (error: any) {
+      console.error('Registration: Error occurred:', error);
+      console.error('Registration: Error response:', error.response?.data);
       setError(error.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -53,7 +61,7 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-barn-900">
-            Join Hearts4Horses
+            Join Hearts4Horses Equestrian Center
           </h2>
           <p className="mt-2 text-barn-700">
             Create your account to start your equestrian journey
