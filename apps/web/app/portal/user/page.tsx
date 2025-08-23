@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { weatherAPI, WeatherData, WeatherForecast } from '@/lib/weather';
+import LogoutConfirmation from '@/components/LogoutConfirmation';
+import SessionTimer from '@/components/SessionTimer';
+import ActivityDashboard from '@/components/ActivityDashboard';
 import { 
   Users, 
   BookOpen, 
@@ -22,7 +25,16 @@ import {
   Cloud,
   CloudRain,
   CloudSnow,
-  Wind
+  Wind,
+  Heart,
+  DollarSign,
+  BarChart3,
+  FileText,
+  Shield,
+  Star,
+  TrendingUp,
+  Activity,
+  Home
 } from 'lucide-react';
 
 interface UserRole {
@@ -42,9 +54,69 @@ interface PortalCard {
   badge?: string;
 }
 
+interface QuickAction {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  href: string;
+  color: string;
+}
+
 export default function UnifiedUserPortal() {
   const { user, userType, isLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  
+  // Confirmation dialog state
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    destination: string;
+    destinationName: string;
+  } | null>(null);
+  
+  // Session timer state
+  const [showSessionSettings, setShowSessionSettings] = useState(false);
+  
+  // Activity dashboard state
+  const [showActivityDashboard, setShowActivityDashboard] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
+  const handleExtendSession = () => {
+    // This will be called when user extends session from timer
+    console.log('Session extended');
+  };
+
+  const handleNavigateToUnprotectedRoute = (destination: string, destinationName: string) => {
+    setPendingNavigation({ destination, destinationName });
+    setShowLogoutConfirmation(true);
+  };
+
+  const handleConfirmNavigation = () => {
+    if (pendingNavigation) {
+      logout();
+      router.push(pendingNavigation.destination);
+    }
+    setShowLogoutConfirmation(false);
+    setPendingNavigation(null);
+  };
+
+  const handleQuickActionClick = (action: QuickAction) => {
+    if (action.id === 'activity') {
+      setShowActivityDashboard(!showActivityDashboard);
+    } else if (action.href.startsWith('/')) {
+      router.push(action.href);
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    setShowLogoutConfirmation(false);
+    setPendingNavigation(null);
+  };
+
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -64,6 +136,18 @@ export default function UnifiedUserPortal() {
       loadWeather();
     }
   }, [isAuthenticated, user, isLoading, router]);
+
+  // Show loading state while authentication is being checked
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const loadUserRoles = async () => {
     try {
@@ -197,6 +281,183 @@ export default function UnifiedUserPortal() {
     return cards;
   };
 
+  const getQuickActions = (): QuickAction[] => {
+    const actions: QuickAction[] = [];
+
+    // Admin-specific actions
+    if (userRoles.some(role => role.key === 'admin')) {
+      actions.push(
+        {
+          id: 'horses',
+          title: 'Manage Horses',
+          description: 'Add, edit, and manage horse profiles',
+          icon: Heart,
+          href: '/portal/user/admin/horses',
+          color: 'bg-green-500'
+        },
+        {
+          id: 'students',
+          title: 'Student Management',
+          description: 'View and manage student accounts',
+          icon: Users,
+          href: '/portal/user/admin/students',
+          color: 'bg-blue-500'
+        },
+        {
+          id: 'calendar',
+          title: 'Calendar & Scheduling',
+          description: 'Manage lessons and events',
+          icon: Calendar,
+          href: '/portal/user/admin/calendar',
+          color: 'bg-purple-500'
+        },
+        {
+          id: 'analytics',
+          title: 'Analytics & Reports',
+          description: 'View business metrics and reports',
+          icon: BarChart3,
+          href: '/portal/user/admin/analytics',
+          color: 'bg-indigo-500'
+        }
+      );
+    }
+
+    // Instructor-specific actions
+    if (userRoles.some(role => role.key === 'instructor')) {
+      actions.push(
+        {
+          id: 'my-students',
+          title: 'My Students',
+          description: 'View and manage your students',
+          icon: Users,
+          href: '/portal/user/instructor/students',
+          color: 'bg-purple-500'
+        },
+        {
+          id: 'schedule',
+          title: 'My Schedule',
+          description: 'View your teaching schedule',
+          icon: Calendar,
+          href: '/portal/user/instructor/schedule',
+          color: 'bg-blue-500'
+        },
+        {
+          id: 'progress',
+          title: 'Student Progress',
+          description: 'Track student development',
+          icon: TrendingUp,
+          href: '/portal/user/instructor/progress',
+          color: 'bg-green-500'
+        }
+      );
+    }
+
+    // Student-specific actions
+    if (userRoles.some(role => role.key === 'student')) {
+      actions.push(
+        {
+          id: 'book-lesson',
+          title: 'Book a Lesson',
+          description: 'Schedule your next riding lesson',
+          icon: Calendar,
+          href: '/portal/user/student/book',
+          color: 'bg-blue-500'
+        },
+        {
+          id: 'my-lessons',
+          title: 'My Lessons',
+          description: 'View upcoming and past lessons',
+          icon: BookOpen,
+          href: '/portal/user/student/lessons',
+          color: 'bg-green-500'
+        },
+        {
+          id: 'progress',
+          title: 'My Progress',
+          description: 'Track your riding progress',
+          icon: TrendingUp,
+          href: '/portal/user/student/progress',
+          color: 'bg-purple-500'
+        }
+      );
+    }
+
+    // Common actions for all users
+    actions.push(
+      {
+        id: 'profile',
+        title: 'My Profile',
+        description: 'Update your personal information',
+        icon: User,
+        href: '/portal/user/profile',
+        color: 'bg-gray-500'
+      },
+      {
+        id: 'notifications',
+        title: 'Notifications',
+        description: 'Manage your notification preferences',
+        icon: Bell,
+        href: '/portal/user/notifications',
+        color: 'bg-yellow-500'
+      },
+      {
+        id: 'activity',
+        title: 'Activity Dashboard',
+        description: 'View your activity history and analytics',
+        icon: Activity,
+        href: '#',
+        color: 'bg-indigo-500'
+      }
+    );
+
+    return actions;
+  };
+
+  const getRoleSpecificStats = () => {
+    const stats = [];
+
+    // Admin stats
+    if (userRoles.some(role => role.key === 'admin')) {
+      stats.push(
+        { label: 'Total Students', value: '45', icon: Users, color: 'text-blue-600' },
+        { label: 'Active Horses', value: '12', icon: Heart, color: 'text-green-600' },
+        { label: 'This Week\'s Lessons', value: '23', icon: Calendar, color: 'text-purple-600' },
+        { label: 'Monthly Revenue', value: '$12,450', icon: DollarSign, color: 'text-green-600' }
+      );
+    }
+
+    // Instructor stats
+    if (userRoles.some(role => role.key === 'instructor')) {
+      stats.push(
+        { label: 'My Students', value: '8', icon: Users, color: 'text-purple-600' },
+        { label: 'Today\'s Lessons', value: '3', icon: Calendar, color: 'text-blue-600' },
+        { label: 'This Week', value: '12', icon: Activity, color: 'text-green-600' },
+        { label: 'Student Rating', value: '4.9★', icon: Star, color: 'text-yellow-600' }
+      );
+    }
+
+    // Student stats
+    if (userRoles.some(role => role.key === 'student')) {
+      stats.push(
+        { label: 'Lessons Completed', value: '24', icon: BookOpen, color: 'text-blue-600' },
+        { label: 'Upcoming Lessons', value: '3', icon: Calendar, color: 'text-green-600' },
+        { label: 'Current Level', value: 'Intermediate', icon: Award, color: 'text-purple-600' },
+        { label: 'Package Balance', value: '5 lessons', icon: DollarSign, color: 'text-orange-600' }
+      );
+    }
+
+    // Default stats if no specific role
+    if (stats.length === 0) {
+      stats.push(
+        { label: 'Notifications', value: getUnreadNotificationsCount().toString(), icon: Bell, color: 'text-blue-600' },
+        { label: 'Announcements', value: getUnreadAnnouncementsCount().toString(), icon: MessageSquare, color: 'text-green-600' },
+        { label: 'Active Roles', value: userRoles.length.toString(), icon: Shield, color: 'text-purple-600' }
+      );
+    }
+
+    return stats;
+  };
+
   const getUnreadNotificationsCount = () => {
     return notifications.filter(n => !n.isRead).length;
   };
@@ -246,6 +507,13 @@ export default function UnifiedUserPortal() {
     return null;
   };
 
+  const getUserTitle = () => {
+    const roles = userRoles.map(role => role.name);
+    if (roles.length === 0) return 'User';
+    if (roles.length === 1) return roles[0];
+    return `${roles[0]} & ${roles.length - 1} more`;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -262,9 +530,29 @@ export default function UnifiedUserPortal() {
   }
 
   const portalCards = getPortalCards();
+  const quickActions = getQuickActions();
+  const roleStats = getRoleSpecificStats();
+  const weatherRecommendation = getWeatherRecommendation();
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Logout Confirmation Dialog */}
+      <LogoutConfirmation
+        isOpen={showLogoutConfirmation}
+        onClose={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        destination={pendingNavigation?.destination || ''}
+        destinationName={pendingNavigation?.destinationName || ''}
+      />
+
+      {/* Session Timer */}
+      <SessionTimer
+        onLogout={handleLogout}
+        onExtendSession={handleExtendSession}
+        showSettings={showSessionSettings}
+        onShowSettings={setShowSessionSettings}
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -272,7 +560,7 @@ export default function UnifiedUserPortal() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.firstName}!</h1>
               <p className="mt-1 text-sm text-gray-500">
-                Access your portals and stay updated with important information
+                {getUserTitle()} • Access your portals and stay updated with important information
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -282,13 +570,31 @@ export default function UnifiedUserPortal() {
                   {getUnreadNotificationsCount()} notifications
                 </span>
               </div>
-              <button
-                onClick={logout}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </button>
+              
+              {/* Navigation Menu */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowSessionSettings(true)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  title="Session Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleNavigateToUnprotectedRoute('/', 'Home Page')}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  <Home className="h-4 w-4 mr-2" />
+                  Home
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -298,247 +604,241 @@ export default function UnifiedUserPortal() {
         {/* Weather and Quick Actions Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Weather Widget */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Weather</h3>
-                <p className="text-3xl font-bold text-blue-600">{weather?.temperature}</p>
-                <p className="text-gray-600">{weather?.condition}</p>
-                <p className="text-sm text-gray-500">{weather?.location}</p>
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Weather at Hearts4Horses</h2>
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-500">Updated just now</span>
+                </div>
               </div>
-              {weather?.condition?.toLowerCase().includes('rain') ? (
-                <CloudRain className="h-12 w-12 text-blue-500" />
-              ) : weather?.condition?.toLowerCase().includes('snow') ? (
-                <CloudSnow className="h-12 w-12 text-gray-400" />
-              ) : weather?.condition?.toLowerCase().includes('cloud') ? (
-                <Cloud className="h-12 w-12 text-gray-500" />
-              ) : (
-                <Sun className="h-12 w-12 text-yellow-500" />
+              
+              {weather && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-gray-900">{weather.temperature}</div>
+                      <div className="text-sm text-gray-500">{weather.condition}</div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <div>Feels like: {weather.feelsLike}</div>
+                        <div>Humidity: {weather.humidity}</div>
+                        <div>Wind: {weather.windSpeed}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {weatherRecommendation && (
+                    <div className={`p-4 rounded-lg border ${
+                      weatherRecommendation.type === 'warning' ? 'border-yellow-200 bg-yellow-50' :
+                      weatherRecommendation.type === 'info' ? 'border-blue-200 bg-blue-50' :
+                      'border-green-200 bg-green-50'
+                    }`}>
+                      <div className="flex items-start">
+                        <weatherRecommendation.icon className={`h-5 w-5 mt-0.5 mr-3 ${
+                          weatherRecommendation.type === 'warning' ? 'text-yellow-600' :
+                          weatherRecommendation.type === 'info' ? 'text-blue-600' :
+                          'text-green-600'
+                        }`} />
+                        <div className="text-sm">
+                          <p className={`font-medium ${
+                            weatherRecommendation.type === 'warning' ? 'text-yellow-800' :
+                            weatherRecommendation.type === 'info' ? 'text-blue-800' :
+                            'text-green-800'
+                          }`}>
+                            {weatherRecommendation.message}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            
-            {/* Weather Details */}
-            {weather?.humidity && weather?.windSpeed && (
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center space-x-2">
-                  <Wind className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">{weather.windSpeed}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-600">Humidity: {weather.humidity}</span>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+            <div className="space-y-3">
+              {quickActions.slice(0, 4).map((action) => {
+                const IconComponent = action.icon;
+                return (
+                  <div
+                    key={action.id}
+                    onClick={() => handleQuickActionClick(action)}
+                    className="block bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                  >
+                    <div className="flex items-center">
+                      <div className={`flex-shrink-0 p-2 rounded-lg ${action.color} bg-opacity-10`}>
+                        <IconComponent className={`h-5 w-5 ${action.color.replace('bg-', 'text-')}`} />
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{action.title}</h4>
+                        <p className="text-xs text-gray-500">{action.description}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Role-Specific Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {roleStats.map((stat, index) => {
+            const IconComponent = stat.icon;
+            return (
+              <div key={index} className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <IconComponent className={`h-8 w-8 ${stat.color}`} />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                  </div>
                 </div>
               </div>
-            )}
+            );
+          })}
+        </div>
 
-            {/* 3-Day Forecast */}
-            {forecast.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">3-Day Forecast</h4>
-                <div className="space-y-2">
-                  {forecast.slice(0, 3).map((day, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{day.date}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900">{day.high}</span>
-                        <span className="text-gray-500">/</span>
-                        <span className="text-gray-600">{day.low}</span>
-                        <span className="text-gray-500">•</span>
-                        <span className="text-gray-600">{day.condition}</span>
+        {/* Portal Cards */}
+        {portalCards.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Portals</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {portalCards.map((card) => {
+                const IconComponent = card.icon;
+                return (
+                  <Link
+                    key={card.id}
+                    href={card.href}
+                    className="group block bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
+                  >
+                    <div className="p-6">
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 p-3 rounded-lg ${card.color} bg-opacity-10`}>
+                          <IconComponent className={`h-6 w-6 ${card.color.replace('bg-', 'text-')}`} />
+                        </div>
+                        <div className="ml-4 flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {card.title}
+                            </h3>
+                            {card.badge && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                card.badge === 'Admin' ? 'bg-green-100 text-green-800' :
+                                card.badge === 'Active' ? 'bg-blue-100 text-blue-800' :
+                                card.badge === 'Teaching' ? 'bg-purple-100 text-purple-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>
+                                {card.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">{card.description}</p>
+                          {card.stats && (
+                            <p className="text-sm font-medium text-gray-900 mt-2">{card.stats}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Activity Dashboard */}
+        {showActivityDashboard && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Your Activity</h3>
+              <div className="flex items-center space-x-2">
+                <Activity className="h-5 w-5 text-blue-600" />
+                <span className="text-sm text-gray-600">Session tracking & analytics</span>
+              </div>
+            </div>
+            <ActivityDashboard />
+          </div>
+        )}
+
+        {/* Notifications and Announcements */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Notifications */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Recent Notifications</h3>
+                <Link href="/portal/user/notifications" className="text-sm text-blue-600 hover:text-blue-500">
+                  View all
+                </Link>
+              </div>
+            </div>
+            <div className="p-6">
+              {notifications.length > 0 ? (
+                <div className="space-y-4">
+                  {notifications.slice(0, 3).map((notification, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                        notification.isRead ? 'bg-gray-300' : 'bg-blue-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{notification.title}</p>
+                        <p className="text-sm text-gray-500">{notification.message}</p>
+                        <p className="text-xs text-gray-400 mt-1">{notification.createdAt}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <Link
-                href="/portal/user/student/book"
-                className="flex items-center justify-between p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
-              >
-                <div className="flex items-center">
-                  <Calendar className="h-5 w-5 text-blue-600 mr-3" />
-                  <span className="text-sm font-medium text-blue-900">Book a Lesson</span>
+              ) : (
+                <div className="text-center py-8">
+                  <Bell className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No notifications yet</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-blue-600" />
-              </Link>
-              <Link
-                href="/portal/user/notifications"
-                className="flex items-center justify-between p-3 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors"
-              >
-                <div className="flex items-center">
-                  <Bell className="h-5 w-5 text-purple-600 mr-3" />
-                  <span className="text-sm font-medium text-purple-900">View Notifications</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-purple-600" />
-              </Link>
-              <Link
-                href="/portal/user/messages"
-                className="flex items-center justify-between p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
-              >
-                <div className="flex items-center">
-                  <MessageSquare className="h-5 w-5 text-green-600 mr-3" />
-                  <span className="text-sm font-medium text-green-900">Messages</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-green-600" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Notifications Summary */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
-            <div className="space-y-3">
-              {notifications.slice(0, 3).map((notification, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                    notification.priority === 'high' ? 'bg-red-500' : 
-                    notification.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
-                  }`}></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 truncate">{notification.title}</p>
-                    <p className="text-xs text-gray-500">{notification.timeAgo}</p>
-                  </div>
-                </div>
-              ))}
-              {notifications.length === 0 && (
-                <p className="text-sm text-gray-500">No recent notifications</p>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Announcements */}
-        {announcements.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Announcements</h3>
-              {getUnreadAnnouncementsCount() > 0 && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  {getUnreadAnnouncementsCount()} new
-                </span>
-              )}
-            </div>
-            <div className="space-y-4">
-              {announcements.slice(0, 3).map((announcement, index) => (
-                <div key={index} className={`p-4 rounded-lg border ${
-                  announcement.isRead ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'
-                }`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{announcement.title}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{announcement.content}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        From {announcement.from} • {announcement.timeAgo}
-                      </p>
-                    </div>
-                    {!announcement.isRead && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full ml-3 mt-2"></div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Portal Cards */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Portals</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {portalCards.map((card) => {
-              const IconComponent = card.icon;
-              return (
-                <Link
-                  key={card.id}
-                  href={card.href}
-                  className="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
-                >
-                  <div className={`h-2 ${card.color}`}></div>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`p-3 rounded-lg ${card.color} bg-opacity-10`}>
-                        <IconComponent className={`h-6 w-6 ${card.color.replace('bg-', 'text-')}`} />
-                      </div>
-                      {card.badge && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          {card.badge}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{card.title}</h3>
-                    <p className="text-sm text-gray-600 mb-4">{card.description}</p>
-                    {card.stats && (
-                      <p className="text-sm font-medium text-gray-900">{card.stats}</p>
-                    )}
-                    <div className="mt-4 flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                      Access Portal
-                      <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </div>
-                  </div>
+          {/* Recent Announcements */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Recent Announcements</h3>
+                <Link href="/portal/user/announcements" className="text-sm text-blue-600 hover:text-blue-500">
+                  View all
                 </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Weather Recommendation */}
-        {getWeatherRecommendation() && (
-          <div className="mt-8 bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Weather Recommendation</h3>
-            <div className="space-y-3">
-              {(() => {
-                const recommendation = getWeatherRecommendation();
-                if (!recommendation) return null;
-                
-                const bgColor = recommendation.type === 'warning' ? 'bg-red-50' : 
-                               recommendation.type === 'success' ? 'bg-green-50' : 'bg-blue-50';
-                const textColor = recommendation.type === 'warning' ? 'text-red-900' : 
-                                 recommendation.type === 'success' ? 'text-green-900' : 'text-blue-900';
-                const iconColor = recommendation.type === 'warning' ? 'text-red-600' : 
-                                 recommendation.type === 'success' ? 'text-green-600' : 'text-blue-600';
-                
-                return (
-                  <div className={`flex items-center space-x-3 p-3 rounded-lg ${bgColor}`}>
-                    <recommendation.icon className={`h-5 w-5 ${iconColor}`} />
-                    <div>
-                      <p className={`text-sm font-medium ${textColor}`}>{recommendation.message}</p>
+              </div>
+            </div>
+            <div className="p-6">
+              {announcements.length > 0 ? (
+                <div className="space-y-4">
+                  {announcements.slice(0, 3).map((announcement, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                        announcement.isRead ? 'bg-gray-300' : 'bg-green-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{announcement.title}</p>
+                        <p className="text-sm text-gray-500">{announcement.content}</p>
+                        <p className="text-xs text-gray-400 mt-1">{announcement.createdAt}</p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Upcoming Events & Reminders */}
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Events & Reminders</h3>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 rounded-lg bg-yellow-50">
-              <Clock className="h-5 w-5 text-yellow-600" />
-              <div>
-                <p className="text-sm font-medium text-yellow-900">Lesson tomorrow at 3:00 PM</p>
-                <p className="text-xs text-yellow-700">Beginner Riding with Gentle Spirit</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 rounded-lg bg-red-50">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-              <div>
-                <p className="text-sm font-medium text-red-900">Package expires in 5 days</p>
-                <p className="text-xs text-red-700">3 lessons remaining - schedule soon!</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 rounded-lg bg-blue-50">
-              <Award className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-blue-900">New announcement from instructor</p>
-                <p className="text-xs text-blue-700">Check your messages for updates</p>
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No announcements yet</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

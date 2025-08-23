@@ -73,6 +73,17 @@ export const apiClient = {
     updateAnnouncement: (id: string, data: any) => api.put(`/admin/announcements/${id}`, data),
     deleteAnnouncement: (id: string) => api.delete(`/admin/announcements/${id}`),
   },
+
+  // Activity endpoints
+  activity: {
+    pageView: (data: { page: string }) => api.post('/activity/page-view', data),
+    action: (data: { action: string; details?: Record<string, any> }) => api.post('/activity/action', data),
+    sessionTimeout: (data: { timeoutMinutes: number }) => api.post('/activity/session-timeout', data),
+    sessionExtended: (data: { newTimeoutMinutes: number }) => api.post('/activity/session-extended', data),
+    sessionWarning: (data: { warningMinutes: number }) => api.post('/activity/session-warning', data),
+    history: (params: { limit?: number }) => api.get('/activity/history', { params }),
+    summary: (params: { days?: number }) => api.get('/activity/summary', { params }),
+  },
 };
 
 export default apiClient;

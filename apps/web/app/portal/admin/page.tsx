@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
   Users, 
@@ -13,9 +13,11 @@ import {
   DollarSign,
   LogOut
 } from 'lucide-react';
+import SessionTimer from '@/components/SessionTimer';
 
 export default function AdminDashboard() {
   const { user, userType, isLoading, isAuthenticated, logout } = useAuth();
+  const [showSessionSettings, setShowSessionSettings] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || userType !== 'admin')) {
@@ -97,8 +99,25 @@ export default function AdminDashboard() {
     }
   ];
 
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
+  const handleExtendSession = () => {
+    // Session was extended by user
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Session Timer */}
+      <SessionTimer
+        onLogout={handleLogout}
+        onExtendSession={handleExtendSession}
+        showSettings={showSessionSettings}
+        onShowSettings={setShowSessionSettings}
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -115,7 +134,14 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-500">Administrator</p>
               </div>
               <button
-                onClick={logout}
+                onClick={() => setShowSessionSettings(true)}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                title="Session Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleLogout}
                 className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
                 <LogOut className="h-4 w-4 mr-2" />

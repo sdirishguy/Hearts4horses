@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
+import bcrypt from 'bcryptjs';
+import { ActivityLogger } from '../services/activityLogger';
 
 const router = Router();
 
@@ -226,6 +228,138 @@ router.get('/messages', requireAuth, async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Get messages error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user profile
+router.get('/profile', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        student: true,
+        guardian: {
+          include: {
+            guardianStudents: {
+              include: {
+                student: {
+                  include: {
+                    user: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { password, ...userWithoutPassword } = user;
+    
+    res.json({ user: userWithoutPassword });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update user profile
+router.put('/profile', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { firstName, lastName, email, phone, currentPassword, newPassword } = req.body;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Validate required fields
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ error: 'First name, last name, and email are required' });
+    }
+
+    // Check if email is already taken by another user
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email,
+        id: { not: userId }
+      }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email address is already in use' });
+    }
+
+    // Update password if provided
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to change password' });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password || '');
+      if (!isPasswordValid) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+
+      const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+      
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          firstName,
+          lastName,
+          email,
+          phone,
+          password: hashedNewPassword,
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // Update without password change
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          firstName,
+          lastName,
+          email,
+          phone,
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    // Log profile update activity
+    await ActivityLogger.logAction(userId, req, 'profile_updated', {
+      fieldsUpdated: Object.keys(req.body).filter(key => key !== 'currentPassword' && key !== 'newPassword')
+    });
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

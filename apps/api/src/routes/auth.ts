@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { ActivityLogger } from '../services/activityLogger';
 const router = express.Router();
 
 // Validation schemas
@@ -13,8 +14,29 @@ const registerSchema = z.object({
   lastName: z.string().min(1),
   phone: z.string().optional(),
   userType: z.enum(['student', 'guardian', 'instructor']),
-  dateOfBirth: z.string().optional(), // For students
-  experienceLevel: z.string().optional(), // For students
+  
+  // Student-specific fields
+  dateOfBirth: z.string().optional(),
+  experienceLevel: z.string().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactPhone: z.string().optional(),
+  emergencyContactRelationship: z.string().optional(),
+  medicalConditions: z.string().optional(),
+  allergies: z.string().optional(),
+  medications: z.string().optional(),
+  insuranceProvider: z.string().optional(),
+  insurancePolicyNumber: z.string().optional(),
+  
+  // Guardian-specific fields (for student registrations)
+  guardianFirstName: z.string().optional(),
+  guardianLastName: z.string().optional(),
+  guardianEmail: z.string().email().optional(),
+  guardianPhone: z.string().optional(),
+  guardianRelationship: z.string().optional(),
+  guardianAddress: z.string().optional(),
+  guardianCity: z.string().optional(),
+  guardianState: z.string().optional(),
+  guardianZipCode: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -59,8 +81,73 @@ router.post('/register', async (req: Request, res: Response) => {
           userId: user.id,
           dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : null,
           experienceLevel: validatedData.experienceLevel,
+          emergencyContactName: validatedData.emergencyContactName,
+          emergencyContactPhone: validatedData.emergencyContactPhone,
+          emergencyContactRelationship: validatedData.emergencyContactRelationship,
+          medicalConditions: validatedData.medicalConditions,
+          allergies: validatedData.allergies,
+          medications: validatedData.medications,
+          insuranceProvider: validatedData.insuranceProvider,
+          insurancePolicyNumber: validatedData.insurancePolicyNumber,
         }
       });
+
+      // Create guardian profile if guardian information is provided
+      if (validatedData.guardianFirstName && validatedData.guardianLastName) {
+        try {
+          const guardianUser = await prisma.user.create({
+            data: {
+              email: validatedData.guardianEmail || `${validatedData.guardianFirstName.toLowerCase()}.${validatedData.guardianLastName.toLowerCase()}@guardian.hearts4horses.com`,
+              firstName: validatedData.guardianFirstName,
+              lastName: validatedData.guardianLastName,
+              phone: validatedData.guardianPhone,
+            }
+          });
+
+          const guardianRole = await prisma.role.findUnique({
+            where: { key: 'guardian' }
+          });
+
+          if (guardianRole) {
+            await prisma.userRole.create({
+              data: {
+                userId: guardianUser.id,
+                roleId: guardianRole.id
+              }
+            });
+          }
+
+          const guardian = await prisma.guardian.create({
+            data: {
+              userId: guardianUser.id,
+              emergencyContactName: validatedData.emergencyContactName,
+              emergencyContactPhone: validatedData.emergencyContactPhone,
+              address: validatedData.guardianAddress,
+              city: validatedData.guardianCity,
+              state: validatedData.guardianState,
+              zipCode: validatedData.guardianZipCode,
+            }
+          });
+
+          // Create guardian-student relationship
+          const student = await prisma.student.findUnique({
+            where: { userId: user.id }
+          });
+
+          if (student) {
+            await prisma.guardianStudent.create({
+              data: {
+                guardianId: guardian.id,
+                studentId: student.id,
+                relationship: validatedData.guardianRelationship,
+              }
+            });
+          }
+        } catch (guardianError) {
+          console.error('Error creating guardian profile:', guardianError);
+          // Continue with student registration even if guardian creation fails
+        }
+      }
     }
 
     // Create guardian profile if userType is guardian
@@ -68,6 +155,12 @@ router.post('/register', async (req: Request, res: Response) => {
       await prisma.guardian.create({
         data: {
           userId: user.id,
+          emergencyContactName: validatedData.emergencyContactName,
+          emergencyContactPhone: validatedData.emergencyContactPhone,
+          address: validatedData.guardianAddress,
+          city: validatedData.guardianCity,
+          state: validatedData.guardianState,
+          zipCode: validatedData.guardianZipCode,
         }
       });
     }
@@ -104,6 +197,19 @@ router.post('/register', async (req: Request, res: Response) => {
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
+
+    // Log registration activity
+    await ActivityLogger.logActivity({
+      userId: user.id,
+      activityType: 'login',
+      description: 'User registered successfully',
+      metadata: {
+        userType: validatedData.userType,
+        registrationMethod: 'email'
+      },
+      ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string,
+      userAgent: req.headers['user-agent'] || 'Unknown'
+    });
 
     // Return user data (without password) and token
     const { password, ...userWithoutPassword } = user;
@@ -204,6 +310,12 @@ router.post('/login', async (req: Request, res: Response) => {
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
+
+    // Log login activity
+    await ActivityLogger.logLogin(user.id, req, {
+      userType,
+      loginMethod: 'email'
+    });
 
     // Return user data (without password) and token
     const { password, ...userWithoutPassword } = user;

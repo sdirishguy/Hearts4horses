@@ -19,6 +19,23 @@ export default function LoginPage() {
   const { login, userType, isAuthenticated } = useAuth();
   const router = useRouter();
 
+  // Check for error messages from URL params (middleware redirects)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const messageParam = urlParams.get('message');
+    const redirectParam = urlParams.get('redirect');
+    
+    if (errorParam === 'session_expired') {
+      setError(messageParam || 'Your session has expired. Please log in again.');
+    }
+    
+    // Store redirect URL for after login
+    if (redirectParam) {
+      sessionStorage.setItem('redirectAfterLogin', redirectParam);
+    }
+  }, []);
+
   // Test if the component is working
   console.log('LoginPage component rendered');
 
@@ -26,14 +43,25 @@ export default function LoginPage() {
   useEffect(() => {
     console.log('Login page: isAuthenticated:', isAuthenticated, 'userType:', userType);
     if (isAuthenticated && userType) {
-      console.log('Login page: Redirecting user to unified portal');
-      window.location.href = '/portal/user';
+      console.log('Login page: Redirecting user based on userType:', userType);
+      
+      // Add a small delay to prevent flashing
+      setTimeout(() => {
+        // Check for stored redirect URL
+        const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+        if (redirectUrl) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          window.location.href = redirectUrl;
+        } else {
+          // Default redirect to unified portal
+          window.location.href = '/portal/user';
+        }
+      }, 100);
     }
   }, [isAuthenticated, userType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Form submitted!'); // Temporary debug alert
     setError('');
     setIsLoading(true);
 

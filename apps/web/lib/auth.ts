@@ -46,6 +46,25 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  student?: Student;
+  guardianStudents?: GuardianStudent[];
+}
+
+export interface GuardianStudent {
+  guardianId: string;
+  studentId: string;
+  relationship?: string;
+  guardian: {
+    id: string;
+    userId: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    user?: User;
+  };
 }
 
 export interface Student {
@@ -54,6 +73,15 @@ export interface Student {
   dateOfBirth?: string;
   experienceLevel?: string;
   notes?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  medicalConditions?: string;
+  allergies?: string;
+  medications?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  profilePictureUrl?: string;
   user: User;
   guardianStudents: any[];
 }
@@ -84,8 +112,32 @@ export interface RegisterData {
   lastName: string;
   phone?: string;
   userType: 'student' | 'guardian' | 'instructor';
+  
+  // Student-specific fields
   dateOfBirth?: string;
   experienceLevel?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  medicalConditions?: string;
+  allergies?: string;
+  medications?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  
+  // Guardian-specific fields (for student registrations)
+  guardianFirstName?: string;
+  guardianLastName?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianRelationship?: string;
+  guardianAddress?: string;
+  guardianCity?: string;
+  guardianState?: string;
+  guardianZipCode?: string;
+  
+  // Profile picture
+  profilePicture?: File;
 }
 
 // Authentication API functions
@@ -105,6 +157,19 @@ export const authAPI = {
   // Get current user
   getCurrentUser: async (): Promise<{ user: User; userType: string; roles: UserRole[] }> => {
     const response = await api.get('/auth/me');
+    return response.data;
+  },
+
+  // Update user profile
+  updateProfile: async (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }): Promise<{ message: string }> => {
+    const response = await api.put('/user/profile', data);
     return response.data;
   },
 
@@ -228,7 +293,25 @@ export const publicAPI = {
 export const tokenUtils = {
   setToken: (token: string) => {
     if (typeof window !== 'undefined') {
+      // Store in localStorage for client-side access (temporary during transition)
       localStorage.setItem('authToken', token);
+      
+      // Set HttpOnly cookie for server-side access
+      // Note: HttpOnly cookies can only be set by the server
+      // For now, we'll use a regular cookie that middleware can read
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const cookieOptions = [
+        `h4h_session=${token}`,
+        'path=/',
+        `max-age=${7 * 24 * 60 * 60}`,
+        'SameSite=Strict'
+      ];
+      
+      if (!isLocalhost) {
+        cookieOptions.push('Secure');
+      }
+      
+      document.cookie = cookieOptions.join('; ');
     }
   },
 
@@ -242,6 +325,8 @@ export const tokenUtils = {
   removeToken: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('authToken');
+      // Remove the cookie
+      document.cookie = 'h4h_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   },
 

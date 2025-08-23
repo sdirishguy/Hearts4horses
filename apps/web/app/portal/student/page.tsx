@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { studentAPI, Student } from '@/lib/auth';
-import { Calendar, Clock, MapPin, Users, Package, BookOpen, User, LogOut } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Package, BookOpen, User, LogOut, Settings } from 'lucide-react';
 import Link from 'next/link';
+import SessionTimer from '@/components/SessionTimer';
 
 export default function StudentPortalPage() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [showSessionSettings, setShowSessionSettings] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +43,10 @@ export default function StudentPortalPage() {
     router.push('/');
   };
 
+  const handleExtendSession = () => {
+    // Session was extended by user
+  };
+
   if (isLoading || isLoadingProfile) {
     return (
       <div className="min-h-screen bg-butter-50 flex items-center justify-center">
@@ -58,6 +64,14 @@ export default function StudentPortalPage() {
 
   return (
     <div className="min-h-screen bg-butter-50">
+      {/* Session Timer */}
+      <SessionTimer
+        onLogout={handleLogout}
+        onExtendSession={handleExtendSession}
+        showSettings={showSessionSettings}
+        onShowSettings={setShowSessionSettings}
+      />
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-butter-300">
         <div className="mx-auto max-w-6xl px-4 py-4">
@@ -77,6 +91,13 @@ export default function StudentPortalPage() {
                 <User className="w-4 h-4" />
                 <span>Welcome, {user?.firstName}!</span>
               </div>
+              <button
+                onClick={() => setShowSessionSettings(true)}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                title="Session Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
               <button 
                 onClick={handleLogout}
                 className="btn btn-outline flex items-center gap-2"
