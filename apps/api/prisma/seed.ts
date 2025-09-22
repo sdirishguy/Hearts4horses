@@ -1,158 +1,13 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('🌱 Seeding database with production data...');
 
-  // Create sample lesson types
-  const lessonTypes = await Promise.all([
-    prisma.lessonType.upsert({
-      where: { id: 'lesson-type-1' },
-      update: {},
-      create: {
-        id: 'lesson-type-1',
-        name: 'Beginner Riding',
-        durationMinutes: 60,
-        priceCents: 7500, // $75.00
-        maxStudents: 1,
-        requiresHorse: true
-      }
-    }),
-    prisma.lessonType.upsert({
-      where: { id: 'lesson-type-2' },
-      update: {},
-      create: {
-        id: 'lesson-type-2',
-        name: 'Intermediate Riding',
-        durationMinutes: 60,
-        priceCents: 8500, // $85.00
-        maxStudents: 1,
-        requiresHorse: true
-      }
-    }),
-    prisma.lessonType.upsert({
-      where: { id: 'lesson-type-3' },
-      update: {},
-      create: {
-        id: 'lesson-type-3',
-        name: 'Advanced Riding',
-        durationMinutes: 90,
-        priceCents: 12000, // $120.00
-        maxStudents: 1,
-        requiresHorse: true
-      }
-    })
-  ]);
-
-  // Create sample products (packages)
-  const products = await Promise.all([
-    prisma.product.upsert({
-      where: { id: 'package-1' },
-      update: {},
-      create: {
-        id: 'package-1',
-        name: 'Starter Package',
-        slug: 'starter-package',
-        type: 'merch',
-        priceCents: 30000, // $300.00
-        description: 'Perfect for beginners - 4 lessons to get you started',
-        media: [],
-        isActive: true
-      }
-    }),
-    prisma.product.upsert({
-      where: { id: 'package-2' },
-      update: {},
-      create: {
-        id: 'package-2',
-        name: 'Standard Package',
-        slug: 'standard-package',
-        type: 'merch',
-        priceCents: 50000, // $500.00
-        description: 'Most popular - 8 lessons for steady progress',
-        media: [],
-        isActive: true
-      }
-    }),
-    prisma.product.upsert({
-      where: { id: 'package-3' },
-      update: {},
-      create: {
-        id: 'package-3',
-        name: 'Premium Package',
-        slug: 'premium-package',
-        type: 'merch',
-        priceCents: 80000, // $800.00
-        description: 'Best value - 12 lessons for serious riders',
-        media: [],
-        isActive: true
-      }
-    })
-  ]);
-
-  // Create sample horses
-  const horses = await Promise.all([
-    prisma.horse.upsert({
-      where: { id: 'horse-1' },
-      update: {},
-      create: {
-        id: 'horse-1',
-        name: 'Thunder',
-        breed: 'Quarter Horse',
-        temperament: 'calm',
-        isActive: true
-      }
-    }),
-    prisma.horse.upsert({
-      where: { id: 'horse-2' },
-      update: {},
-      create: {
-        id: 'horse-2',
-        name: 'Storm',
-        breed: 'Arabian',
-        temperament: 'spirited',
-        isActive: true
-      }
-    })
-  ]);
-
-  // Create sample availability slots
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  
-  const slots = await Promise.all([
-    prisma.availabilitySlot.upsert({
-      where: { id: 'slot-1' },
-      update: {},
-      create: {
-        id: 'slot-1',
-        date: tomorrow,
-        startTime: new Date(tomorrow.getTime() + 9 * 60 * 60 * 1000), // 9 AM
-        endTime: new Date(tomorrow.getTime() + 10 * 60 * 60 * 1000), // 10 AM
-        lessonTypeId: 'lesson-type-1',
-        horseId: 'horse-1',
-        capacity: 1,
-        status: 'open'
-      }
-    }),
-    prisma.availabilitySlot.upsert({
-      where: { id: 'slot-2' },
-      update: {},
-      create: {
-        id: 'slot-2',
-        date: tomorrow,
-        startTime: new Date(tomorrow.getTime() + 14 * 60 * 60 * 1000), // 2 PM
-        endTime: new Date(tomorrow.getTime() + 15 * 60 * 60 * 1000), // 3 PM
-        lessonTypeId: 'lesson-type-2',
-        horseId: 'horse-2',
-        capacity: 1,
-        status: 'open'
-      }
-    })
-  ]);
-
-  // Create roles first
+  // Create roles
+  console.log('Creating roles...');
   const roles = await Promise.all([
     prisma.role.upsert({
       where: { key: 'admin' },
@@ -173,84 +28,298 @@ async function main() {
       where: { key: 'instructor' },
       update: {},
       create: { key: 'instructor' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'owner' },
+      update: {},
+      create: { key: 'owner' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'manager' },
+      update: {},
+      create: { key: 'manager' }
+    }),
+    prisma.role.upsert({
+      where: { key: 'staff' },
+      update: {},
+      create: { key: 'staff' }
     })
   ]);
 
-  // Create sample users
-  const bcrypt = require('bcryptjs');
-  
+  // Create lesson types - production pricing
+  console.log('Creating lesson types...');
+  const lessonTypes = await Promise.all([
+    prisma.lessonType.upsert({
+      where: { id: 'private-30' },
+      update: {},
+      create: {
+        id: 'private-30',
+        name: 'Private 30 Minutes',
+        durationMinutes: 30,
+        priceCents: 5500, // $55.00
+        maxStudents: 1,
+        requiresHorse: true
+      }
+    }),
+    prisma.lessonType.upsert({
+      where: { id: 'private-60' },
+      update: {},
+      create: {
+        id: 'private-60',
+        name: 'Private 60 Minutes',
+        durationMinutes: 60,
+        priceCents: 9500, // $95.00
+        maxStudents: 1,
+        requiresHorse: true
+      }
+    }),
+    prisma.lessonType.upsert({
+      where: { id: 'group-60' },
+      update: {},
+      create: {
+        id: 'group-60',
+        name: 'Group Lesson (60 min)',
+        durationMinutes: 60,
+        priceCents: 4500, // $45.00 per student
+        maxStudents: 4,
+        requiresHorse: true
+      }
+    }),
+    prisma.lessonType.upsert({
+      where: { id: 'ground-work' },
+      update: {},
+      create: {
+        id: 'ground-work',
+        name: 'Ground Work & Horse Care',
+        durationMinutes: 45,
+        priceCents: 4000, // $40.00
+        maxStudents: 2,
+        requiresHorse: false
+      }
+    }),
+    prisma.lessonType.upsert({
+      where: { id: 'trail-ride' },
+      update: {},
+      create: {
+        id: 'trail-ride',
+        name: 'Trail Ride',
+        durationMinutes: 90,
+        priceCents: 12000, // $120.00
+        maxStudents: 3,
+        requiresHorse: true
+      }
+    })
+  ]);
+
+  // Create lesson packages - production pricing
+  console.log('Creating lesson packages...');
+  const products = await Promise.all([
+    prisma.product.upsert({
+      where: { slug: 'starter-package' },
+      update: {},
+      create: {
+        name: '4-Lesson Starter Package',
+        slug: 'starter-package',
+        type: 'merch',
+        priceCents: 35000, // $350.00 ($87.50 per lesson)
+        description: 'Perfect for beginners wanting to try horseback riding. Includes 4 private 30-minute lessons.',
+        media: [],
+        isActive: true
+      }
+    }),
+    prisma.product.upsert({
+      where: { slug: 'standard-package' },
+      update: {},
+      create: {
+        name: '8-Lesson Standard Package',
+        slug: 'standard-package',
+        type: 'merch',
+        priceCents: 68000, // $680.00 ($85 per lesson)
+        description: 'Our most popular package. 8 private 30-minute lessons for consistent progress.',
+        media: [],
+        isActive: true
+      }
+    }),
+    prisma.product.upsert({
+      where: { slug: 'premium-package' },
+      update: {},
+      create: {
+        name: '12-Lesson Premium Package',
+        slug: 'premium-package',
+        type: 'merch',
+        priceCents: 96000, // $960.00 ($80 per lesson)
+        description: 'Best value for committed riders. 12 private 30-minute lessons.',
+        media: [],
+        isActive: true
+      }
+    }),
+    prisma.product.upsert({
+      where: { slug: 'summer-camp' },
+      update: {},
+      create: {
+        name: 'Summer Horse Camp (1 Week)',
+        slug: 'summer-camp',
+        type: 'merch',
+        priceCents: 45000, // $450.00
+        description: 'Week-long summer camp including daily lessons, horse care, and fun activities.',
+        media: [],
+        isActive: true
+      }
+    })
+  ]);
+
+  // Create form templates - production forms
+  console.log('Creating form templates...');
+  const formTemplates = await Promise.all([
+    prisma.formTemplate.upsert({
+      where: { key: 'liability_waiver' },
+      update: {},
+      create: {
+        key: 'liability_waiver',
+        title: 'Liability Waiver and Release Form',
+        schemaJson: {
+          type: 'object',
+          properties: {
+            participantName: { type: 'string', title: 'Participant Full Name' },
+            dateOfBirth: { type: 'string', format: 'date', title: 'Date of Birth' },
+            parentGuardianName: { type: 'string', title: 'Parent/Guardian Name (if under 18)' },
+            address: { type: 'string', title: 'Address' },
+            city: { type: 'string', title: 'City' },
+            state: { type: 'string', title: 'State' },
+            zipCode: { type: 'string', title: 'ZIP Code' },
+            phoneNumber: { type: 'string', title: 'Phone Number' },
+            emailAddress: { type: 'string', format: 'email', title: 'Email Address' },
+            emergencyContactName: { type: 'string', title: 'Emergency Contact Name' },
+            emergencyContactPhone: { type: 'string', title: 'Emergency Contact Phone' },
+            emergencyContactRelationship: { type: 'string', title: 'Relationship to Participant' },
+            medicalConditions: { type: 'string', title: 'Medical Conditions/Allergies' },
+            medications: { type: 'string', title: 'Current Medications' },
+            physicianName: { type: 'string', title: 'Physician Name' },
+            physicianPhone: { type: 'string', title: 'Physician Phone' },
+            insuranceProvider: { type: 'string', title: 'Insurance Provider' },
+            insurancePolicyNumber: { type: 'string', title: 'Policy Number' },
+            acknowledgmentOfRisk: { type: 'boolean', title: 'I acknowledge that horseback riding involves inherent risks' },
+            releaseOfLiability: { type: 'boolean', title: 'I release Hearts4Horses from all liability' },
+            medicalAuthorization: { type: 'boolean', title: 'I authorize emergency medical treatment if necessary' },
+            agreeToTerms: { type: 'boolean', title: 'I have read and agree to all terms and conditions' }
+          },
+          required: [
+            'participantName',
+            'dateOfBirth',
+            'address',
+            'city',
+            'state',
+            'zipCode',
+            'phoneNumber',
+            'emergencyContactName',
+            'emergencyContactPhone',
+            'acknowledgmentOfRisk',
+            'releaseOfLiability',
+            'medicalAuthorization',
+            'agreeToTerms'
+          ]
+        },
+        renderVersion: 1
+      }
+    }),
+    prisma.formTemplate.upsert({
+      where: { key: 'photo_release' },
+      update: {},
+      create: {
+        key: 'photo_release',
+        title: 'Photo and Video Release Form',
+        schemaJson: {
+          type: 'object',
+          properties: {
+            participantName: { type: 'string', title: 'Participant Name' },
+            parentGuardianName: { type: 'string', title: 'Parent/Guardian Name (if under 18)' },
+            grantPermission: { type: 'boolean', title: 'I grant permission for photos/videos to be taken' },
+            useForWebsite: { type: 'boolean', title: 'May be used on Hearts4Horses website' },
+            useForSocialMedia: { type: 'boolean', title: 'May be used on social media platforms' },
+            useForMarketing: { type: 'boolean', title: 'May be used in marketing materials' },
+            useForNews: { type: 'boolean', title: 'May be shared with news media' },
+            agreeToTerms: { type: 'boolean', title: 'I agree to the photo/video release terms' }
+          },
+          required: ['participantName', 'grantPermission', 'agreeToTerms']
+        },
+        renderVersion: 1
+      }
+    }),
+    prisma.formTemplate.upsert({
+      where: { key: 'student_intake' },
+      update: {},
+      create: {
+        key: 'student_intake',
+        title: 'New Student Intake Form',
+        schemaJson: {
+          type: 'object',
+          properties: {
+            ridingExperience: { 
+              type: 'string', 
+              title: 'Previous Riding Experience',
+              enum: ['none', 'beginner', 'intermediate', 'advanced']
+            },
+            ridingGoals: { type: 'string', title: 'Riding Goals' },
+            preferredDays: {
+              type: 'array',
+              title: 'Preferred Lesson Days',
+              items: {
+                type: 'string',
+                enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+              }
+            },
+            preferredTimes: {
+              type: 'string',
+              title: 'Preferred Time',
+              enum: ['morning', 'afternoon', 'evening', 'flexible']
+            },
+            physicaLimitations: { type: 'string', title: 'Physical Limitations or Concerns' },
+            fearsConcerns: { type: 'string', title: 'Any Fears or Concerns about Horses' },
+            additionalNotes: { type: 'string', title: 'Additional Notes or Requests' }
+          },
+          required: ['ridingExperience', 'ridingGoals']
+        },
+        renderVersion: 1
+      }
+    })
+  ]);
+
+  // Create initial admin user (should be changed immediately in production)
+  console.log('Creating initial admin user...');
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@hearts4horses.com' },
     update: {},
     create: {
       email: 'admin@hearts4horses.com',
-      password: await bcrypt.hash('admin123', 10),
+      password: await bcrypt.hash('ChangeMe123!', 10), // Must be changed on first login
       firstName: 'Admin',
       lastName: 'User',
+      phone: '555-0100',
       isActive: true
     }
   });
 
-  const studentUser = await prisma.user.upsert({
-    where: { email: 'student@example.com' },
+  // Assign admin role
+  await prisma.userRole.upsert({
+    where: { 
+      userId_roleId: { 
+        userId: adminUser.id, 
+        roleId: roles.find(r => r.key === 'admin')!.id 
+      } 
+    },
     update: {},
     create: {
-      email: 'student@example.com',
-      password: await bcrypt.hash('password123', 10),
-      firstName: 'John',
-      lastName: 'Student',
-      isActive: true
+      userId: adminUser.id,
+      roleId: roles.find(r => r.key === 'admin')!.id
     }
   });
-
-  const guardianUser = await prisma.user.upsert({
-    where: { email: 'guardian@example.com' },
-    update: {},
-    create: {
-      email: 'guardian@example.com',
-      password: await bcrypt.hash('password123', 10),
-      firstName: 'Jane',
-      lastName: 'Guardian',
-      isActive: true
-    }
-  });
-
-  // Assign roles to users
-  await Promise.all([
-    prisma.userRole.upsert({
-      where: { userId_roleId: { userId: adminUser.id, roleId: roles[0].id } },
-      update: {},
-      create: {
-        userId: adminUser.id,
-        roleId: roles[0].id // admin role
-      }
-    }),
-    prisma.userRole.upsert({
-      where: { userId_roleId: { userId: studentUser.id, roleId: roles[1].id } },
-      update: {},
-      create: {
-        userId: studentUser.id,
-        roleId: roles[1].id // student role
-      }
-    }),
-    prisma.userRole.upsert({
-      where: { userId_roleId: { userId: guardianUser.id, roleId: roles[2].id } },
-      update: {},
-      create: {
-        userId: guardianUser.id,
-        roleId: roles[2].id // guardian role
-      }
-    })
-  ]);
-
-  const users = [adminUser, studentUser, guardianUser];
 
   console.log('✅ Database seeded successfully!');
-  console.log(`Created ${lessonTypes.length} lesson types`);
-  console.log(`Created ${products.length} products`);
-  console.log(`Created ${horses.length} horses`);
-  console.log(`Created ${slots.length} availability slots`);
-  console.log(`Created ${users.length} users`);
+  console.log('');
+  console.log('⚠️  IMPORTANT: Change the admin password immediately!');
+  console.log('    Email: admin@hearts4horses.com');
+  console.log('    Temporary Password: ChangeMe123!');
+  console.log('');
 }
 
 main()

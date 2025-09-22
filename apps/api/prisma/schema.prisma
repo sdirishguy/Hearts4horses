@@ -7,19 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model UserActivity {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activityType String  // 'login', 'logout', 'page_view', 'action', 'session_timeout', 'session_extended'
-  description String?
-  metadata    Json?    // Additional data like page URL, action details, etc.
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  @@map("user_activities")
-}
+// ============================================
+// User & Authentication Models
+// ============================================
 
 model User {
   id                String             @id @default(uuid())
@@ -29,8 +19,13 @@ model User {
   lastName          String
   phone             String?
   isActive          Boolean            @default(true)
+  emailVerified     Boolean            @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+  
+  // Relations
   announcements     Announcement[]
   instructorSlots   AvailabilitySlot[] @relation("InstructorSlots")
   formSubmissions   FormSubmission[]
@@ -44,381 +39,932 @@ model User {
   userAnnouncements UserNotification[]
   userActivities    UserActivity[]
   roles             UserRole[]
+  passwordResets    PasswordReset[]
 
+  @@index([email])
   @@map("users")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@map("password_resets")
 }
 
 model Role {
   id    Int        @id @default(autoincrement())
   key   String     @unique
+  name  String?
   users UserRole[]
 
   @@map("roles")
 }
 
 model UserRole {
-  userId String
-  roleId Int
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  roleId    Int
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@id([userId, roleId])
   @@map("user_roles")
 }
 
-model Student {
-  id               String            @id @default(uuid())
-  userId           String            @unique
-  dateOfBirth      DateTime?
-  experienceLevel  String?
-  notes            String?
-  emergencyContactName      String?
-  emergencyContactPhone     String?
-  emergencyContactRelationship String?
-  medicalConditions         String?
-  allergies                String?
-  medications              String?
-  insuranceProvider        String?
-  insurancePolicyNumber    String?
-  profilePictureUrl        String?
-  formSubmissions  FormSubmission[]
-  guardianStudents GuardianStudent[] @relation("StudentGuardians")
-  bookings         LessonBooking[]
-  packages         StudentPackage[]
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+model UserActivity {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityType String  // login, logout, page_view, action, etc.
+  description String?
+  metadata    Json?    
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
 
+  @@index([userId, activityType])
+  @@map("user_activities")
+}
+
+// ============================================
+// Student & Guardian Models
+// ============================================
+
+model Student {
+  id                           String            @id @default(uuid())
+  userId                       String            @unique
+  dateOfBirth                  DateTime?
+  experienceLevel              String?           // beginner, intermediate, advanced
+  notes                        String?           @db.Text
+  
+  // Emergency Contact
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  
+  // Medical Information
+  medicalConditions            String?           @db.Text
+  allergies                    String?           @db.Text
+  medications                  String?           @db.Text
+  physicianName                String?
+  physicianPhone               String?
+  
+  // Insurance
+  insuranceProvider            String?
+  insurancePolicyNumber        String?
+  
+  // Profile
+  profilePictureUrl            String?
+  preferredHorseId             String?
+  
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+  
+  // Relations
+  user                         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredHorse               Horse?            @relation(fields: [preferredHorseId], references: [id])
+  formSubmissions              FormSubmission[]
+  guardianStudents             GuardianStudent[]
+  bookings                     LessonBooking[]
+  packages                     StudentPackage[]
+  progressReports              ProgressNote[]
+
+  @@index([userId])
   @@map("students")
 }
 
 model Guardian {
   id                    String            @id @default(uuid())
   userId                String            @unique
-  emergencyContactName  String?
-  emergencyContactPhone String?
+  
+  // Contact Information
   address               String?
   city                  String?
   state                 String?
-  zipCode               String?
-  guardianStudents      GuardianStudent[] @relation("GuardianStudents")
-  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zipCode              String?
+  
+  // Emergency Contact (if different from guardian)
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  
+  // Relations
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardianStudents     GuardianStudent[]
 
+  @@index([userId])
   @@map("guardians")
 }
 
 model GuardianStudent {
   guardianId   String
   studentId    String
-  relationship String?
-  guardian     Guardian @relation("GuardianStudents", fields: [guardianId], references: [id], onDelete: Cascade)
-  student      Student  @relation("StudentGuardians", fields: [studentId], references: [id], onDelete: Cascade)
+  relationship String?      // parent, grandparent, legal_guardian, etc.
+  isPrimary    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  
+  guardian     Guardian     @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@id([guardianId, studentId])
   @@map("guardian_students")
 }
 
-model Horse {
-  id          String             @id @default(uuid())
-  name        String
-  breed       String?
-  dob         DateTime?
-  sex         String?
-  temperament Temperament?
-  weight      Float?
-  height      Float?
-  bio         String?
-  isActive    Boolean            @default(true)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  slots       AvailabilitySlot[]
+// ============================================
+// Horse Models
+// ============================================
 
+model Horse {
+  id                String              @id @default(uuid())
+  name              String
+  breed             String?
+  dateOfBirth       DateTime?
+  sex               String?             // mare, gelding, stallion
+  color             String?
+  temperament       Temperament?
+  weight            Float?              // in pounds
+  height            Float?              // in hands
+  
+  // Health & Care
+  veterinarian      String?
+  farrier           String?
+  lastVetCheck      DateTime?
+  lastFarrierVisit  DateTime?
+  healthNotes       String?             @db.Text
+  
+  // Training & Use
+  trainingLevel     String?             // beginner, intermediate, advanced
+  specialties       String[]            // jumping, dressage, trail, therapy
+  maxRiderWeight    Int?                // in pounds
+  
+  bio               String?             @db.Text
+  isActive          Boolean             @default(true)
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relations
+  availabilitySlots AvailabilitySlot[]
+  lessonBookings    LessonBooking[]
+  preferredByStudents Student[]
+  healthRecords     HorseHealthRecord[]
+  media             HorseMedia[]
+
+  @@index([isActive])
   @@map("horses")
 }
 
-model LessonType {
-  id              String                @id @default(uuid())
-  name            String
-  durationMinutes Int
-  priceCents      Int
-  maxStudents     Int                   @default(1)
-  requiresHorse   Boolean               @default(true)
-  slots           AvailabilitySlot[]
-  templates       LessonBlockTemplate[]
-  packages        StudentPackage[]
+model HorseHealthRecord {
+  id          String   @id @default(uuid())
+  horseId     String
+  horse       Horse    @relation(fields: [horseId], references: [id], onDelete: Cascade)
+  type        String   // vaccination, injury, treatment, checkup
+  description String   @db.Text
+  veterinarian String?
+  treatmentDate DateTime
+  followUpDate DateTime?
+  attachments String[]
+  createdAt   DateTime @default(now())
+  
+  @@index([horseId, type])
+  @@map("horse_health_records")
+}
 
+model HorseMedia {
+  id        String   @id @default(uuid())
+  horseId   String
+  horse     Horse    @relation(fields: [horseId], references: [id], onDelete: Cascade)
+  url       String
+  type      String   // photo, video
+  caption   String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  @@index([horseId])
+  @@map("horse_media")
+}
+
+// ============================================
+// Lesson & Scheduling Models
+// ============================================
+
+model LessonType {
+  id                   String                 @id @default(uuid())
+  name                 String
+  code                 String                 @unique
+  durationMinutes      Int
+  priceCents           Int
+  maxStudents          Int                    @default(1)
+  minAge               Int?
+  maxAge               Int?
+  requiresHorse        Boolean                @default(true)
+  description          String?                @db.Text
+  prerequisites        String?                @db.Text
+  isActive             Boolean                @default(true)
+  
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  
+  // Relations
+  availabilitySlots    AvailabilitySlot[]
+  lessonBookings       LessonBooking[]
+  lessonTemplates      LessonBlockTemplate[]
+  packages             StudentPackage[]
+
+  @@index([code, isActive])
   @@map("lesson_types")
 }
 
 model LessonBlockTemplate {
-  id           String     @id @default(uuid())
-  instructorId String?
-  weekday      Int
-  startTime    DateTime
-  durationMins Int
-  capacity     Int        @default(1)
-  lessonTypeId String
-  lessonType   LessonType @relation(fields: [lessonTypeId], references: [id])
+  id            String      @id @default(uuid())
+  instructorId  String?
+  name          String
+  weekday       Int         // 0 = Sunday, 6 = Saturday
+  startTime     String      // HH:MM format
+  endTime       String      // HH:MM format
+  capacity      Int         @default(1)
+  lessonTypeId  String
+  isActive      Boolean     @default(true)
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  lessonType    LessonType  @relation(fields: [lessonTypeId], references: [id])
 
+  @@index([weekday, isActive])
   @@map("lesson_block_templates")
 }
 
 model AvailabilitySlot {
-  id           String          @id @default(uuid())
-  date         DateTime
-  startTime    DateTime
-  endTime      DateTime
-  instructorId String?
-  lessonTypeId String
-  capacity     Int             @default(1)
-  horseId      String?
-  status       SlotStatus      @default(open)
-  horse        Horse?          @relation(fields: [horseId], references: [id])
-  instructor   User?           @relation("InstructorSlots", fields: [instructorId], references: [id])
-  lessonType   LessonType      @relation(fields: [lessonTypeId], references: [id])
-  bookings     LessonBooking[]
+  id            String          @id @default(uuid())
+  date          DateTime        @db.Date
+  startTime     DateTime
+  endTime       DateTime
+  instructorId  String?
+  lessonTypeId  String
+  capacity      Int             @default(1)
+  bookedCount   Int             @default(0)
+  horseId       String?
+  status        SlotStatus      @default(open)
+  notes         String?
+  
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  // Relations
+  instructor    User?           @relation("InstructorSlots", fields: [instructorId], references: [id])
+  lessonType    LessonType      @relation(fields: [lessonTypeId], references: [id])
+  horse         Horse?          @relation(fields: [horseId], references: [id])
+  bookings      LessonBooking[]
 
   @@unique([date, startTime, instructorId])
+  @@index([date, status])
+  @@index([instructorId, date])
   @@map("availability_slots")
 }
 
 model LessonBooking {
-  id              String           @id @default(uuid())
-  slotId          String
-  studentId       String
-  status          BookingStatus    @default(booked)
-  paymentSource   String
-  stripePaymentId String?
-  notes           String?
-  createdAt       DateTime         @default(now())
-  slot            AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  progressNotes   ProgressNote[]
+  id                String         @id @default(uuid())
+  slotId            String
+  studentId         String
+  lessonTypeId      String
+  horseId           String?
+  status            BookingStatus  @default(booked)
+  
+  // Payment
+  paymentSource     String?        // package, single, comp
+  packageId         String?
+  stripePaymentId   String?
+  amountPaidCents   Int?
+  
+  // Details
+  notes             String?        @db.Text
+  cancellationReason String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  
+  // Check-in
+  checkedInAt       DateTime?
+  checkedInBy       String?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // Relations
+  slot              AvailabilitySlot @relation(fields: [slotId], references: [id])
+  student           Student          @relation(fields: [studentId], references: [id])
+  lessonType        LessonType       @relation(fields: [lessonTypeId], references: [id])
+  horse             Horse?           @relation(fields: [horseId], references: [id])
+  package           StudentPackage?  @relation(fields: [packageId], references: [id])
+  progressNotes     ProgressNote[]
 
+  @@index([studentId, status])
+  @@index([slotId])
   @@map("lesson_bookings")
 }
 
 model ProgressNote {
-  id              String        @id @default(uuid())
-  lessonBookingId String
-  instructorId    String
-  rating          Int?
-  skillsJson      Json?
-  noteText        String?
-  createdAt       DateTime      @default(now())
-  instructor      User          @relation(fields: [instructorId], references: [id])
-  lessonBooking   LessonBooking @relation(fields: [lessonBookingId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  lessonBookingId  String
+  instructorId     String
+  
+  // Performance
+  overallRating    Int?           // 1-5
+  skillsAssessed   Json?          // JSON object with skill ratings
+  
+  // Notes
+  publicNotes      String?        @db.Text // Visible to student/guardian
+  privateNotes     String?        @db.Text // Internal only
+  
+  // Goals & Homework
+  goalsAchieved    String[]
+  homework         String?        @db.Text
+  nextLessonFocus  String?        @db.Text
+  
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  // Relations
+  lessonBooking    LessonBooking  @relation(fields: [lessonBookingId], references: [id], onDelete: Cascade)
+  instructor       User           @relation(fields: [instructorId], references: [id])
+  student          Student?       @relation(fields: [studentId], references: [id])
+  studentId        String?
 
+  @@index([lessonBookingId])
+  @@index([studentId])
   @@map("progress_notes")
 }
 
-model StudentPackage {
-  id               String     @id @default(uuid())
-  studentId        String
-  lessonTypeId     String
-  lessonsIncluded  Int
-  remainingLessons Int
-  expiresAt        DateTime?
-  stripePaymentId  String?
-  status           String
-  createdAt        DateTime   @default(now())
-  lessonType       LessonType @relation(fields: [lessonTypeId], references: [id])
-  student          Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+// ============================================
+// Package & Payment Models
+// ============================================
 
+model StudentPackage {
+  id                String          @id @default(uuid())
+  studentId         String
+  lessonTypeId      String
+  
+  // Package Details
+  packageName       String
+  lessonsIncluded   Int
+  remainingLessons  Int
+  pricePaidCents    Int
+  
+  // Validity
+  purchasedAt       DateTime        @default(now())
+  activatedAt       DateTime?
+  expiresAt         DateTime?
+  
+  // Payment
+  stripePaymentId   String?
+  invoiceNumber     String?
+  
+  status            PackageStatus   @default(active)
+  notes             String?
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  student           Student         @relation(fields: [studentId], references: [id])
+  lessonType        LessonType      @relation(fields: [lessonTypeId], references: [id])
+  bookings          LessonBooking[]
+
+  @@index([studentId, status])
   @@map("student_packages")
 }
 
-model Product {
-  id          String      @id @default(uuid())
-  name        String
-  slug        String      @unique
-  type        ProductType
-  priceCents  Int
-  stockQty    Int?
-  description String
-  media       String[]
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
+// ============================================
+// E-commerce Models
+// ============================================
 
+model Product {
+  id            String       @id @default(uuid())
+  name          String
+  slug          String       @unique
+  type          ProductType
+  sku           String?      @unique
+  
+  // Pricing
+  priceCents    Int
+  comparePriceCents Int?     // For showing discounts
+  
+  // Inventory
+  stockQty      Int?
+  lowStockThreshold Int?     @default(5)
+  
+  // Details
+  description   String       @db.Text
+  features      String[]
+  
+  // Media
+  media         String[]
+  
+  // SEO
+  metaTitle     String?
+  metaDescription String?
+  
+  isActive      Boolean      @default(true)
+  isFeatured    Boolean      @default(false)
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  orderItems    OrderItem[]
+  categories    ProductCategory[]
+
+  @@index([slug, isActive])
+  @@index([type])
   @@map("products")
 }
 
-model Order {
-  id               String      @id @default(uuid())
-  userId           String
-  status           OrderStatus @default(pending)
-  subtotalCents    Int
-  taxCents         Int
-  shippingCents    Int
-  totalCents       Int
-  stripeCheckoutId String?
-  createdAt        DateTime    @default(now())
-  orderItems       OrderItem[]
-  user             User        @relation(fields: [userId], references: [id])
+model ProductCategory {
+  id          String   @id @default(uuid())
+  productId   String
+  category    String
+  
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([productId, category])
+  @@map("product_categories")
+}
 
+model Order {
+  id                String       @id @default(uuid())
+  orderNumber       String       @unique
+  userId            String
+  
+  // Totals
+  subtotalCents     Int
+  taxCents          Int
+  shippingCents     Int
+  discountCents     Int          @default(0)
+  totalCents        Int
+  
+  // Payment
+  stripeCheckoutId  String?
+  stripePaymentIntentId String?
+  paymentMethod     String?
+  
+  // Shipping
+  shippingName      String?
+  shippingAddress   String?
+  shippingCity      String?
+  shippingState     String?
+  shippingZip       String?
+  shippingPhone     String?
+  
+  // Status
+  status            OrderStatus  @default(pending)
+  
+  // Dates
+  paidAt            DateTime?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  cancelledAt       DateTime?
+  
+  notes             String?      @db.Text
+  
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  user              User         @relation(fields: [userId], references: [id])
+  orderItems        OrderItem[]
+
+  @@index([userId, status])
+  @@index([orderNumber])
   @@map("orders")
 }
 
 model OrderItem {
-  id             String  @id @default(uuid())
-  orderId        String
-  productId      String
-  quantity       Int
-  unitPriceCents Int
-  metaJson       Json?
-  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product        Product @relation(fields: [productId], references: [id])
+  id              String   @id @default(uuid())
+  orderId         String
+  productId       String
+  
+  // Item Details
+  productName     String   // Snapshot at time of order
+  productSku      String?
+  quantity        Int
+  unitPriceCents  Int
+  totalCents      Int
+  
+  // Customization
+  customization   Json?
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
 
+  @@index([orderId])
   @@map("order_items")
 }
+
+// ============================================
+// Content & Media Models
+// ============================================
 
 model MediaAsset {
   id          String   @id @default(uuid())
   ownerUserId String?
-  kind        String
+  
+  // Media Details
+  type        String   // image, video, document
   url         String
+  thumbnailUrl String?
+  filename    String?
+  mimeType    String?
+  sizeBytes   Int?
+  
+  // Metadata
   altText     String?
-  source      String
-  publishedAt DateTime @default(now())
+  caption     String?
+  tags        String[]
+  
+  // Source
+  source      String   // upload, instagram, facebook, youtube
+  sourceId    String?  // External platform ID
+  
+  isPublic    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
   owner       User?    @relation(fields: [ownerUserId], references: [id])
 
+  @@index([ownerUserId, type])
   @@map("media_assets")
 }
 
 model Testimonial {
-  id               String   @id @default(uuid())
-  authorName       String
-  photoUrl         String?
-  quote            String
-  approvedByUserId String?
-  isPublished      Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  approvedBy       User?    @relation("ApprovedTestimonials", fields: [approvedByUserId], references: [id])
+  id                String    @id @default(uuid())
+  
+  // Author
+  authorName        String
+  authorEmail       String?
+  authorPhone       String?
+  photoUrl          String?
+  
+  // Content
+  rating            Int?      // 1-5 stars
+  title             String?
+  quote             String    @db.Text
+  
+  // Publishing
+  isPublished       Boolean   @default(false)
+  publishedAt       DateTime?
+  isFeatured        Boolean   @default(false)
+  
+  // Approval
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  approvedBy        User?     @relation("ApprovedTestimonials", fields: [approvedByUserId], references: [id])
 
+  @@index([isPublished, isFeatured])
   @@map("testimonials")
 }
+
+// ============================================
+// Forms & Documents Models
+// ============================================
 
 model FormTemplate {
   id            String           @id @default(uuid())
   key           String           @unique
   title         String
+  description   String?
+  category      String?          // waiver, medical, intake, etc.
+  
+  // Schema
   schemaJson    Json
-  renderVersion Int              @default(1)
+  uiSchemaJson  Json?           // UI customization
+  
+  // Versioning
+  version       Int              @default(1)
+  isActive      Boolean          @default(true)
+  
+  // Requirements
+  requiredForStudents Boolean    @default(false)
+  requiredForGuardians Boolean   @default(false)
+  expiryDays    Int?            // Days until re-signing required
+  
   createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  // Relations
   submissions   FormSubmission[]
 
+  @@index([key, isActive])
   @@map("form_templates")
 }
 
 model FormSubmission {
-  id             String       @id @default(uuid())
-  formTemplateId String
-  userId         String?
-  studentId      String?
-  dataJson       Json
-  signedPdfUrl   String?
-  signatureBlob  String?
-  signedAt       DateTime?
-  ipAddress      String
-  createdAt      DateTime     @default(now())
-  formTemplate   FormTemplate @relation(fields: [formTemplateId], references: [id])
-  student        Student?     @relation(fields: [studentId], references: [id])
-  user           User?        @relation(fields: [userId], references: [id])
+  id              String        @id @default(uuid())
+  formTemplateId  String
+  
+  // Submitter
+  userId          String?
+  studentId       String?
+  submitterEmail  String?
+  submitterName   String?
+  
+  // Data
+  dataJson        Json
+  
+  // Signature
+  signatureDataUrl String?      @db.Text
+  signedAt        DateTime?
+  
+  // Document
+  pdfUrl          String?
+  
+  // Tracking
+  ipAddress       String
+  userAgent       String?
+  
+  // Validity
+  isValid         Boolean       @default(true)
+  expiresAt       DateTime?
+  
+  createdAt       DateTime      @default(now())
+  
+  // Relations
+  formTemplate    FormTemplate  @relation(fields: [formTemplateId], references: [id])
+  user            User?         @relation(fields: [userId], references: [id])
+  student         Student?      @relation(fields: [studentId], references: [id])
 
+  @@index([userId, formTemplateId])
+  @@index([studentId, formTemplateId])
   @@map("form_submissions")
 }
 
-model Event {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  location    String?
-  startAt     DateTime
-  endAt       DateTime
-  capacity    Int?
-  priceCents  Int?
-  createdAt   DateTime @default(now())
-
-  @@map("events")
-}
-
-model WebhookEvent {
-  id          String    @id @default(uuid())
-  provider    String
-  eventId     String
-  type        String
-  payloadJson Json
-  processedAt DateTime?
-  status      String    @default("pending")
-  retries     Int       @default(0)
-  createdAt   DateTime  @default(now())
-
-  @@map("webhook_events")
-}
-
-model AuditLog {
-  id          String   @id @default(uuid())
-  actorUserId String?
-  action      String
-  targetTable String
-  targetId    String?
-  diffJson    Json?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
-
-  @@map("audit_logs")
-}
+// ============================================
+// Communication Models
+// ============================================
 
 model Notification {
-  id        String    @id @default(uuid())
-  userId    String
-  title     String
-  content   String
-  type      String
-  priority  String    @default("medium")
-  isRead    Boolean   @default(false)
-  dataJson  Json?
-  createdAt DateTime  @default(now())
-  readAt    DateTime?
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  userId      String
+  
+  // Content
+  title       String
+  content     String    @db.Text
+  
+  // Type & Priority
+  type        String    // system, lesson, payment, announcement, etc.
+  priority    String    @default("medium") // low, medium, high, urgent
+  
+  // Status
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  
+  // Action
+  actionUrl   String?
+  actionLabel String?
+  
+  // Data
+  dataJson    Json?
+  
+  // Expiry
+  expiresAt   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, isRead])
+  @@index([type])
   @@map("notifications")
 }
 
 model Announcement {
   id                String             @id @default(uuid())
+  
+  // Content
   title             String
-  content           String
+  content           String             @db.Text
+  
+  // Author
   authorId          String
+  
+  // Display
   priority          String             @default("medium")
+  bannerColor       String?
+  icon              String?
+  
+  // Publishing
   isPublished       Boolean            @default(true)
   publishedAt       DateTime           @default(now())
   expiresAt         DateTime?
+  
+  // Targeting
+  targetRoles       String[]          // Which roles should see this
+  
   createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
   author            User               @relation(fields: [authorId], references: [id])
   userNotifications UserNotification[]
 
+  @@index([isPublished, expiresAt])
   @@map("announcements")
 }
 
 model UserNotification {
   userId         String
   announcementId String
+  
   isRead         Boolean      @default(false)
   readAt         DateTime?
+  isDismissed    Boolean      @default(false)
+  dismissedAt    DateTime?
+  
   createdAt      DateTime     @default(now())
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  
+  // Relations
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
 
   @@id([userId, announcementId])
-  @@map("user_announcements")
+  @@map("user_notifications")
 }
+
+// ============================================
+// Events Models
+// ============================================
+
+model Event {
+  id            String    @id @default(uuid())
+  
+  // Basic Info
+  name          String
+  slug          String    @unique
+  description   String    @db.Text
+  type          String    // camp, show, clinic, fundraiser, etc.
+  
+  // Schedule
+  startAt       DateTime
+  endAt         DateTime
+  registrationOpensAt DateTime?
+  registrationClosesAt DateTime?
+  
+  // Location
+  location      String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  
+  // Capacity
+  capacity      Int?
+  spotsReserved Int       @default(0)
+  
+  // Pricing
+  priceCents    Int?
+  earlyBirdPriceCents Int?
+  earlyBirdDeadline DateTime?
+  
+  // Details
+  ageMin        Int?
+  ageMax        Int?
+  experienceRequired String?
+  
+  // Media
+  imageUrl      String?
+  
+  // Status
+  status        String    @default("draft") // draft, published, cancelled
+  isFeatured    Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  registrations EventRegistration[]
+
+  @@index([slug, status])
+  @@index([startAt, status])
+  @@map("events")
+}
+
+model EventRegistration {
+  id              String    @id @default(uuid())
+  eventId         String
+  
+  // Registrant
+  userId          String?
+  studentId       String?
+  
+  // Contact (if not a user)
+  registrantName  String?
+  registrantEmail String?
+  registrantPhone String?
+  
+  // Payment
+  paidCents       Int?
+  stripePaymentId String?
+  
+  // Status
+  status          String    @default("pending") // pending, confirmed, cancelled
+  
+  // Notes
+  specialRequests String?   @db.Text
+  
+  confirmedAt     DateTime?
+  cancelledAt     DateTime?
+  
+  createdAt       DateTime  @default(now())
+  
+  // Relations
+  event           Event     @relation(fields: [eventId], references: [id])
+
+  @@index([eventId, status])
+  @@map("event_registrations")
+}
+
+// ============================================
+// System Models
+// ============================================
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  provider    String    // stripe, twilio, etc.
+  eventId     String    // Provider's event ID
+  type        String
+  payloadJson Json
+  
+  processedAt DateTime?
+  status      String    @default("pending") // pending, processed, failed
+  error       String?   @db.Text
+  retries     Int       @default(0)
+  
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@index([status, createdAt])
+  @@map("webhook_events")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  
+  // Actor
+  actorUserId String?
+  actorType   String   // user, system, webhook
+  
+  // Action
+  action      String   // create, update, delete, etc.
+  entityType  String   // user, booking, payment, etc.
+  entityId    String?
+  
+  // Changes
+  oldValues   Json?
+  newValues   Json?
+  
+  // Context
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// Enums
+// ============================================
 
 enum Temperament {
   calm
   spirited
   green
   steady
+  energetic
+  lazy
 }
 
 enum SlotStatus {
@@ -426,24 +972,42 @@ enum SlotStatus {
   held
   booked
   closed
+  cancelled
 }
 
 enum BookingStatus {
+  pending
   booked
+  confirmed
   completed
   cancelled
   no_show
+  rescheduled
 }
 
 enum OrderStatus {
   pending
+  processing
   paid
   fulfilled
+  shipped
+  delivered
   cancelled
+  refunded
 }
 
 enum ProductType {
   merch
-  digital
+  lesson_package
   gift_card
+  digital
+  equipment
+  feed
+}
+
+enum PackageStatus {
+  active
+  expired
+  depleted
+  cancelled
 }
