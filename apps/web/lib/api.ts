@@ -61,8 +61,10 @@ export const apiClient = {
   // Student endpoints
   student: {
     slots: (params?: any) => api.get('/student/slots', { params }),
+    getAvailableSlots: (params?: any) => api.get('/student/slots', { params }),
     bookings: () => api.get('/student/bookings'),
     createBooking: (data: any) => api.post('/student/bookings', data),
+    bookLesson: (data: any) => api.post('/student/bookings', data),
     cancelBooking: (id: string) => api.delete(`/student/bookings/${id}`),
   },
 
@@ -72,6 +74,11 @@ export const apiClient = {
     createAnnouncement: (data: any) => api.post('/admin/announcements', data),
     updateAnnouncement: (id: string, data: any) => api.put(`/admin/announcements/${id}`, data),
     deleteAnnouncement: (id: string) => api.delete(`/admin/announcements/${id}`),
+    // Horse management
+    getHorses: () => api.get('/admin/horses'),
+    createHorse: (data: any) => api.post('/admin/horses', data),
+    updateHorse: (id: string, data: any) => api.put(`/admin/horses/${id}`, data),
+    deleteHorse: (id: string) => api.delete(`/admin/horses/${id}`),
   },
 
   // Activity endpoints
