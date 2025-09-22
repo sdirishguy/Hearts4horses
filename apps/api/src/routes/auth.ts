@@ -3,10 +3,15 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { createError } from '../middleware/errorHandler';
 import { ActivityLogger } from '../services/activityLogger';
+
 const router = express.Router();
 
-// Validation schemas
+// Schemas for registration and login. Keeping these in one place makes the
+// expected payload explicit. Additional fields for students/guardians are
+// optional to support flexible onboarding.
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -14,8 +19,7 @@ const registerSchema = z.object({
   lastName: z.string().min(1),
   phone: z.string().optional(),
   userType: z.enum(['student', 'guardian', 'instructor']),
-  
-  // Student-specific fields
+  // Student‑specific fields
   dateOfBirth: z.string().optional(),
   experienceLevel: z.string().optional(),
   emergencyContactName: z.string().optional(),
@@ -26,8 +30,7 @@ const registerSchema = z.object({
   medications: z.string().optional(),
   insuranceProvider: z.string().optional(),
   insurancePolicyNumber: z.string().optional(),
-  
-  // Guardian-specific fields (for student registrations)
+  // Guardian‑specific fields
   guardianFirstName: z.string().optional(),
   guardianLastName: z.string().optional(),
   guardianEmail: z.string().email().optional(),
@@ -44,372 +47,240 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-// Register new user
-router.post('/register', async (req: Request, res: Response) => {
-  try {
-    const validatedData = registerSchema.parse(req.body);
-    
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: validatedData.email }
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ 
-        error: 'User with this email already exists' 
-      });
-    }
-
+// -----------------------------------------------------------------------------
+// POST /register - Register a new user. Performs validation, prevents
+// duplicate accounts by email and assigns roles. Student registrations may
+// optionally include guardian information.
+router.post(
+  '/register',
+  asyncHandler(async (req: Request, res: Response) => {
+    const validated = registerSchema.parse(req.body);
+    // Check for existing user
+    const existing = await prisma.user.findUnique({ where: { email: validated.email } });
+    if (existing) throw createError('User with this email already exists', 400);
     // Hash password
-    const hashedPassword = await bcrypt.hash(validatedData.password, 12);
-
-    // Create user
+    const hashed = await bcrypt.hash(validated.password, 12);
+    // Create user record
     const user = await prisma.user.create({
       data: {
-        email: validatedData.email,
-        password: hashedPassword,
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-        phone: validatedData.phone,
-      }
+        email: validated.email,
+        password: hashed,
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+        phone: validated.phone,
+      },
     });
-
-    // Create student profile if userType is student
-    if (validatedData.userType === 'student') {
+    // If student, create student profile
+    if (validated.userType === 'student') {
       await prisma.student.create({
         data: {
           userId: user.id,
-          dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : null,
-          experienceLevel: validatedData.experienceLevel,
-          emergencyContactName: validatedData.emergencyContactName,
-          emergencyContactPhone: validatedData.emergencyContactPhone,
-          emergencyContactRelationship: validatedData.emergencyContactRelationship,
-          medicalConditions: validatedData.medicalConditions,
-          allergies: validatedData.allergies,
-          medications: validatedData.medications,
-          insuranceProvider: validatedData.insuranceProvider,
-          insurancePolicyNumber: validatedData.insurancePolicyNumber,
-        }
+          dateOfBirth: validated.dateOfBirth ? new Date(validated.dateOfBirth) : null,
+          experienceLevel: validated.experienceLevel,
+          emergencyContactName: validated.emergencyContactName,
+          emergencyContactPhone: validated.emergencyContactPhone,
+          emergencyContactRelationship: validated.emergencyContactRelationship,
+          medicalConditions: validated.medicalConditions,
+          allergies: validated.allergies,
+          medications: validated.medications,
+          insuranceProvider: validated.insuranceProvider,
+          insurancePolicyNumber: validated.insurancePolicyNumber,
+        },
       });
-
-      // Create guardian profile if guardian information is provided
-      if (validatedData.guardianFirstName && validatedData.guardianLastName) {
+      // Optionally create guardian account if names provided
+      if (validated.guardianFirstName && validated.guardianLastName) {
         try {
+          const guardianEmail = validated.guardianEmail || `${validated.guardianFirstName.toLowerCase()}.${validated.guardianLastName.toLowerCase()}@guardian.hearts4horses.com`;
           const guardianUser = await prisma.user.create({
             data: {
-              email: validatedData.guardianEmail || `${validatedData.guardianFirstName.toLowerCase()}.${validatedData.guardianLastName.toLowerCase()}@guardian.hearts4horses.com`,
-              firstName: validatedData.guardianFirstName,
-              lastName: validatedData.guardianLastName,
-              phone: validatedData.guardianPhone,
-            }
+              email: guardianEmail,
+              firstName: validated.guardianFirstName,
+              lastName: validated.guardianLastName,
+              phone: validated.guardianPhone,
+            },
           });
-
-          const guardianRole = await prisma.role.findUnique({
-            where: { key: 'guardian' }
-          });
-
+          const guardianRole = await prisma.role.findUnique({ where: { key: 'guardian' } });
           if (guardianRole) {
-            await prisma.userRole.create({
-              data: {
-                userId: guardianUser.id,
-                roleId: guardianRole.id
-              }
-            });
+            await prisma.userRole.create({ data: { userId: guardianUser.id, roleId: guardianRole.id } });
           }
-
           const guardian = await prisma.guardian.create({
             data: {
               userId: guardianUser.id,
-              emergencyContactName: validatedData.emergencyContactName,
-              emergencyContactPhone: validatedData.emergencyContactPhone,
-              address: validatedData.guardianAddress,
-              city: validatedData.guardianCity,
-              state: validatedData.guardianState,
-              zipCode: validatedData.guardianZipCode,
-            }
+              emergencyContactName: validated.emergencyContactName,
+              emergencyContactPhone: validated.emergencyContactPhone,
+              address: validated.guardianAddress,
+              city: validated.guardianCity,
+              state: validated.guardianState,
+              zipCode: validated.guardianZipCode,
+            },
           });
-
-          // Create guardian-student relationship
-          const student = await prisma.student.findUnique({
-            where: { userId: user.id }
-          });
-
+          const student = await prisma.student.findUnique({ where: { userId: user.id } });
           if (student) {
             await prisma.guardianStudent.create({
               data: {
                 guardianId: guardian.id,
                 studentId: student.id,
-                relationship: validatedData.guardianRelationship,
-              }
+                relationship: validated.guardianRelationship,
+              },
             });
           }
         } catch (guardianError) {
-          console.error('Error creating guardian profile:', guardianError);
-          // Continue with student registration even if guardian creation fails
+          // Log and continue. Guardian creation failure should not block registration.
+          console.error('Guardian creation failed:', guardianError);
         }
       }
     }
-
-    // Create guardian profile if userType is guardian
-    if (validatedData.userType === 'guardian') {
+    // If guardian, create guardian profile linked to user
+    if (validated.userType === 'guardian') {
       await prisma.guardian.create({
         data: {
           userId: user.id,
-          emergencyContactName: validatedData.emergencyContactName,
-          emergencyContactPhone: validatedData.emergencyContactPhone,
-          address: validatedData.guardianAddress,
-          city: validatedData.guardianCity,
-          state: validatedData.guardianState,
-          zipCode: validatedData.guardianZipCode,
-        }
+          emergencyContactName: validated.emergencyContactName,
+          emergencyContactPhone: validated.emergencyContactPhone,
+          address: validated.guardianAddress,
+          city: validated.guardianCity,
+          state: validated.guardianState,
+          zipCode: validated.guardianZipCode,
+        },
       });
     }
-
-    // Assign role to user based on userType
-    const roleKey = validatedData.userType;
-    const role = await prisma.role.findUnique({
-      where: { key: roleKey }
-    });
-
+    // Assign primary role to user
+    const role = await prisma.role.findUnique({ where: { key: validated.userType } });
     if (role) {
       await prisma.userRole.upsert({
-        where: {
-          userId_roleId: {
-            userId: user.id,
-            roleId: role.id
-          }
-        },
+        where: { userId_roleId: { userId: user.id, roleId: role.id } },
         update: {},
-        create: {
-          userId: user.id,
-          roleId: role.id
-        }
+        create: { userId: user.id, roleId: role.id },
       });
     }
-
-    // Generate JWT token
+    // Generate JWT
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email,
-        userType: validatedData.userType 
-      },
+      { userId: user.id, email: user.email, userType: validated.userType },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
-
-    // Log registration activity
+    // Log registration activity (use correct activityType)
     await ActivityLogger.logActivity({
       userId: user.id,
-      activityType: 'login',
+      activityType: 'action',
       description: 'User registered successfully',
-      metadata: {
-        userType: validatedData.userType,
-        registrationMethod: 'email'
-      },
-      ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string,
-      userAgent: req.headers['user-agent'] || 'Unknown'
+      metadata: { userType: validated.userType, registrationMethod: 'email' },
+      ipAddress: req.ip || req.connection.remoteAddress || (req.headers['x-forwarded-for'] as string),
+      userAgent: req.headers['user-agent'] || 'Unknown',
     });
-
-    // Return user data (without password) and token
-    const { password, ...userWithoutPassword } = user;
-    
-    // Get user with roles for response
+    // Exclude password from response
+    const { password, ...userSansPassword } = user;
     const userWithRoles = await prisma.user.findUnique({
       where: { id: user.id },
-      include: {
-        roles: {
-          include: {
-            role: true
-          }
-        }
-      }
+      include: { roles: { include: { role: true } } },
     });
-
     res.status(201).json({
       message: 'User registered successfully',
-      user: userWithoutPassword,
+      user: userSansPassword,
       token,
-      userType: validatedData.userType,
-      roles: userWithRoles?.roles.map(userRole => ({
-        id: userRole.role.id,
-        key: userRole.role.key,
-        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
-      })) || []
+      userType: validated.userType,
+      roles: userWithRoles?.roles.map((ur) => ({
+        id: ur.role.id,
+        key: ur.role.key,
+        name: ur.role.key.charAt(0).toUpperCase() + ur.role.key.slice(1),
+      })) || [],
     });
+  })
+);
 
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation error', 
-        details: error.errors 
-      });
-    }
-    
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Login user
-router.post('/login', async (req: Request, res: Response) => {
-  try {
-    const validatedData = loginSchema.parse(req.body);
-    
-    // Find user with roles
+// -----------------------------------------------------------------------------
+// POST /login - Authenticate a user and issue a JWT. Performs constant time
+// password comparison to mitigate timing attacks. Returns role information to
+// the client for client‑side routing.
+router.post(
+  '/login',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email, password } = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({
-      where: { email: validatedData.email },
+      where: { email },
       include: {
         student: true,
         guardian: true,
-        roles: {
-          include: {
-            role: true
-          }
-        }
-      }
+        roles: { include: { role: true } },
+      },
     });
-
-    if (!user) {
-      return res.status(401).json({ 
-        error: 'Invalid email or password' 
-      });
-    }
-
-    // Check password
-    const isPasswordValid = await bcrypt.compare(validatedData.password, user.password || '');
-    
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        error: 'Invalid email or password' 
-      });
-    }
-
-    // Determine user type from roles
-    let userType = 'user';
-    const roleKeys = user.roles.map(userRole => userRole.role.key);
-    
+    if (!user) throw createError('Invalid email or password', 401);
+    const isValid = await bcrypt.compare(password, user.password || '');
+    if (!isValid) throw createError('Invalid email or password', 401);
+    // Determine highest priority role for userType
+    const roleKeys = user.roles.map((ur) => ur.role.key);
+    let userType: string = 'user';
     if (roleKeys.includes('admin')) userType = 'admin';
     else if (roleKeys.includes('student')) userType = 'student';
     else if (roleKeys.includes('guardian')) userType = 'guardian';
     else if (roleKeys.includes('instructor')) userType = 'instructor';
-    else {
-      // If user has no roles, return an error
-      return res.status(401).json({ 
-        error: 'User account not properly configured. Please contact support.' 
-      });
-    }
-
-    // Generate JWT token
+    else throw createError('User account not properly configured', 401);
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email,
-        userType 
-      },
+      { userId: user.id, email: user.email, userType },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
-
-    // Log login activity
-    await ActivityLogger.logLogin(user.id, req, {
-      userType,
-      loginMethod: 'email'
-    });
-
-    // Return user data (without password) and token
-    const { password, ...userWithoutPassword } = user;
-    
+    await ActivityLogger.logLogin(user.id, req, { userType, loginMethod: 'email' });
+    const { password: pw, ...userSansPassword } = user as any;
     res.json({
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: userSansPassword,
       token,
       userType,
-      roles: user.roles.map(userRole => ({
-        id: userRole.role.id,
-        key: userRole.role.key,
-        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
-      }))
+      roles: user.roles.map((ur) => ({
+        id: ur.role.id,
+        key: ur.role.key,
+        name: ur.role.key.charAt(0).toUpperCase() + ur.role.key.slice(1),
+      })),
     });
+  })
+);
 
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation error', 
-        details: error.errors 
-      });
-    }
-    
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get current user
-router.get('/me', async (req: Request, res: Response) => {
-  try {
+// -----------------------------------------------------------------------------
+// GET /me - Return details of the currently authenticated user. The JWT is
+// expected in the Authorization header. If the token is valid, returns user
+// profile and role information.
+router.get(
+  '/me',
+  asyncHandler(async (req: Request, res: Response) => {
     const authHeader = req.headers.authorization;
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+      throw createError('No token provided', 401);
     }
-
     const token = authHeader.substring(7);
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (err) {
+      throw createError('Invalid token', 401);
+    }
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
         student: true,
         guardian: true,
-        roles: {
-          include: {
-            role: true
-          }
-        }
-      }
+        roles: { include: { role: true } },
+      },
     });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    // Determine user type from roles
-    let userType = 'user';
-    const roleKeys = user.roles.map(userRole => userRole.role.key);
-    
+    if (!user) throw createError('User not found', 401);
+    const roleKeys = user.roles.map((ur) => ur.role.key);
+    let userType: string = 'user';
     if (roleKeys.includes('admin')) userType = 'admin';
     else if (roleKeys.includes('student')) userType = 'student';
     else if (roleKeys.includes('guardian')) userType = 'guardian';
     else if (roleKeys.includes('instructor')) userType = 'instructor';
-    else {
-      // If user has no roles, return an error
-      return res.status(401).json({ 
-        error: 'User account not properly configured. Please contact support.' 
-      });
-    }
-
-    const { password, ...userWithoutPassword } = user;
-    
+    else throw createError('User account not properly configured', 401);
+    const { password: p, ...userSansPassword } = user as any;
     res.json({
-      user: userWithoutPassword,
+      user: userSansPassword,
       userType,
-      roles: user.roles.map(userRole => ({
-        id: userRole.role.id,
-        key: userRole.role.key,
-        name: userRole.role.key.charAt(0).toUpperCase() + userRole.role.key.slice(1)
-      }))
+      roles: user.roles.map((ur) => ({
+        id: ur.role.id,
+        key: ur.role.key,
+        name: ur.role.key.charAt(0).toUpperCase() + ur.role.key.slice(1),
+      })),
     });
-
-  } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    
-    console.error('Get user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  })
+);
 
 export default router;

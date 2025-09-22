@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 
 const router = express.Router();
 
-// Get all horses
+// For now these public endpoints return static data. In the future these
+// should be backed by database tables and cached appropriately.
 router.get('/horses', async (req: Request, res: Response) => {
   const horses = [
     {
@@ -11,7 +12,7 @@ router.get('/horses', async (req: Request, res: Response) => {
       breed: 'Arabian',
       temperament: 'spirited',
       bio: 'Beautiful Arabian with a gentle spirit. Perfect for intermediate riders.',
-      isActive: true
+      isActive: true,
     },
     {
       id: '2',
@@ -19,7 +20,7 @@ router.get('/horses', async (req: Request, res: Response) => {
       breed: 'Quarter Horse',
       temperament: 'calm',
       bio: 'Reliable Quarter Horse. Great for beginners and trail riding.',
-      isActive: true
+      isActive: true,
     },
     {
       id: '3',
@@ -27,16 +28,12 @@ router.get('/horses', async (req: Request, res: Response) => {
       breed: 'Thoroughbred',
       temperament: 'spirited',
       bio: 'Former racehorse with a heart of gold. Excellent for advanced riders.',
-      isActive: true
-    }
+      isActive: true,
+    },
   ];
-
-  res.json({
-    data: horses
-  });
+  res.json({ data: horses });
 });
 
-// Get lesson types and pricing
 router.get('/services', async (req: Request, res: Response) => {
   const lessonTypes = [
     {
@@ -46,7 +43,7 @@ router.get('/services', async (req: Request, res: Response) => {
       priceCents: 4500,
       maxStudents: 1,
       requiresHorse: true,
-      description: 'One-on-one instruction with a certified instructor'
+      description: 'One-on-one instruction with a certified instructor',
     },
     {
       id: '2',
@@ -55,7 +52,7 @@ router.get('/services', async (req: Request, res: Response) => {
       priceCents: 7500,
       maxStudents: 1,
       requiresHorse: true,
-      description: 'Extended one-on-one instruction for more advanced training'
+      description: 'Extended one-on-one instruction for more advanced training',
     },
     {
       id: '3',
@@ -64,7 +61,7 @@ router.get('/services', async (req: Request, res: Response) => {
       priceCents: 5500,
       maxStudents: 4,
       requiresHorse: true,
-      description: 'Group instruction with 2-4 students of similar skill level'
+      description: 'Group instruction with 2-4 students of similar skill level',
     },
     {
       id: '4',
@@ -73,16 +70,12 @@ router.get('/services', async (req: Request, res: Response) => {
       priceCents: 15000,
       maxStudents: 8,
       requiresHorse: true,
-      description: 'Full day camp including riding, horse care, and activities'
-    }
+      description: 'Full day camp including riding, horse care, and activities',
+    },
   ];
-
-  res.json({
-    data: lessonTypes
-  });
+  res.json({ data: lessonTypes });
 });
 
-// Get testimonials
 router.get('/testimonials', async (req: Request, res: Response) => {
   const testimonials = [
     {
@@ -90,27 +83,24 @@ router.get('/testimonials', async (req: Request, res: Response) => {
       studentName: 'Sarah Johnson',
       rating: 5,
       content: 'Amazing experience! My daughter has learned so much and loves coming to lessons every week.',
-      isPublished: true
+      isPublished: true,
     },
     {
       id: '2',
       studentName: 'Mike Chen',
       rating: 5,
-      content: 'The instructors are patient and knowledgeable. I\'ve improved my riding skills tremendously.',
-      isPublished: true
+      content: "The instructors are patient and knowledgeable. I've improved my riding skills tremendously.",
+      isPublished: true,
     },
     {
       id: '3',
       studentName: 'Emma Davis',
       rating: 5,
       content: 'Best riding school in the area! The horses are well-cared for and the facilities are beautiful.',
-      isPublished: true
-    }
+      isPublished: true,
+    },
   ];
-
-  res.json({
-    data: testimonials
-  });
+  res.json({ data: testimonials });
 });
 
 export default router;
