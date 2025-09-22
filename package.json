@@ -1,32 +1,47 @@
 {
   "name": "hearts4horses",
   "version": "1.0.0",
-  "description": "Hearts4Horses - Equestrian training and lesson management platform",
+  "description": "Equestrian training and lesson management platform",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
-    "dev:web": "npm run dev --workspace=apps/web",
-    "dev:api": "npm run dev --workspace=apps/api",
-    "build": "npm run build --workspaces",
-    "start": "npm run start --workspace=apps/api",
-    "db:generate": "npm run db:generate --workspace=apps/api",
-    "db:migrate": "npm run db:migrate --workspace=apps/api",
-    "db:seed": "npm run db:seed --workspace=apps/api",
-    "lint": "npm run lint --workspaces",
-    "lint:fix": "npm run lint:fix --workspaces",
-    "format": "npm run format --workspaces",
-    "type-check": "npm run type-check --workspaces"
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:api": "turbo run dev --filter=@hearts4horses/api",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "db:generate": "cd apps/api && npm run db:generate",
+    "db:migrate": "cd apps/api && npm run db:migrate",
+    "db:migrate:prod": "cd apps/api && npm run db:migrate:prod",
+    "db:seed": "cd apps/api && npm run db:seed",
+    "db:seed:prod": "cd apps/api && npm run db:seed:prod",
+    "db:studio": "cd apps/api && npm run db:studio",
+    "db:reset": "cd apps/api && npm run db:reset",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "prepare": "husky install"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "prettier": "^3.1.0",
-    "lint-staged": "^15.2.0",
-    "husky": "^8.0.3"
+    "@types/node": "^20.10.5",
+    "eslint": "^8.56.0",
+    "husky": "^8.0.3",
+    "prettier": "^3.1.1",
+    "turbo": "^1.11.2",
+    "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
-  }
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hearts4horses/platform"
+  },
+  "author": "Hearts4Horses",
+  "license": "MIT"
 }
