@@ -1,255 +1,184 @@
 import express, { Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { createError } from '../middleware/errorHandler';
+
 const router = express.Router();
 
-// Apply authentication middleware to all admin routes
+// Attach guards at router level to enforce admin access on all routes
 router.use(authenticateToken);
 router.use(requireAdmin);
 
-// Announcements Management
-
-// Get all announcements (admin only)
-router.get('/announcements', async (req: Request, res: Response) => {
-  try {
-    const announcements = await prisma.announcement.findMany({
-      include: {
-        author: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    const announcementsWithAuthorName = announcements.map(announcement => ({
-      ...announcement,
-      authorName: `${announcement.author.firstName} ${announcement.author.lastName}`
-    }));
-
-    res.json({
-      announcements: announcementsWithAuthorName
-    });
-
-  } catch (error) {
-    console.error('Get announcements error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// Schemas for validating announcement and horse payloads
+const announcementSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  content: z.string().min(1, 'Content is required'),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  isPublished: z.boolean().optional(),
+  expiresAt: z.string().optional(),
 });
 
-// Create new announcement
-router.post('/announcements', async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    const { title, content, priority, isPublished, expiresAt } = req.body;
+const horseSchema = z.object({
+  name: z.string().min(1, 'Horse name is required'),
+  breed: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  sex: z.string().optional(),
+  temperament: z.enum(['calm', 'spirited', 'green', 'steady', 'energetic', 'lazy']).optional(),
+  weight: z.string().optional(),
+  height: z.string().optional(),
+  bio: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
 
-    if (!title || !content) {
-      return res.status(400).json({ error: 'Title and content are required' });
-    }
+// -----------------------------------------------------------------------------
+// Announcements Management
 
+// GET /announcements - Return all announcements in descending order of creation
+router.get(
+  '/announcements',
+  asyncHandler(async (req: Request, res: Response) => {
+    const announcements = await prisma.announcement.findMany({
+      include: { author: { select: { firstName: true, lastName: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const formatted = announcements.map((a) => ({
+      ...a,
+      authorName: `${a.author.firstName} ${a.author.lastName}`,
+    }));
+    res.json({ announcements: formatted });
+  })
+);
+
+// POST /announcements - Create a new announcement
+router.post(
+  '/announcements',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { title, content, priority, isPublished, expiresAt } = announcementSchema.parse(req.body);
+    const authorId = req.user!.userId;
     const announcement = await prisma.announcement.create({
       data: {
         title,
         content,
-        authorId: userId!,
+        authorId,
         priority: priority || 'medium',
-        isPublished: isPublished !== undefined ? isPublished : true,
-        expiresAt: expiresAt ? new Date(expiresAt) : null
+        isPublished: isPublished ?? true,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
-      include: {
-        author: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        }
-      }
+      include: { author: { select: { firstName: true, lastName: true } } },
     });
-
     res.status(201).json({
       announcement: {
         ...announcement,
-        authorName: `${announcement.author.firstName} ${announcement.author.lastName}`
-      }
-    });
-
-  } catch (error) {
-    console.error('Create announcement error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Update announcement
-router.put('/announcements/:id', async (req: Request, res: Response) => {
-  try {
-    const announcementId = req.params.id;
-    const { title, content, priority, isPublished, expiresAt } = req.body;
-
-    if (!title || !content) {
-      return res.status(400).json({ error: 'Title and content are required' });
-    }
-
-    const announcement = await prisma.announcement.update({
-      where: {
-        id: announcementId
+        authorName: `${announcement.author.firstName} ${announcement.author.lastName}`,
       },
+    });
+  })
+);
+
+// PUT /announcements/:id - Update an existing announcement
+router.put(
+  '/announcements/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { title, content, priority, isPublished, expiresAt } = announcementSchema.parse(req.body);
+    const announcement = await prisma.announcement.update({
+      where: { id },
       data: {
         title,
         content,
         priority: priority || 'medium',
-        isPublished: isPublished !== undefined ? isPublished : true,
-        expiresAt: expiresAt ? new Date(expiresAt) : null
+        isPublished: isPublished ?? true,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
-      include: {
-        author: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        }
-      }
+      include: { author: { select: { firstName: true, lastName: true } } },
     });
-
     res.json({
       announcement: {
         ...announcement,
-        authorName: `${announcement.author.firstName} ${announcement.author.lastName}`
-      }
+        authorName: `${announcement.author.firstName} ${announcement.author.lastName}`,
+      },
     });
+  })
+);
 
-  } catch (error) {
-    console.error('Update announcement error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Delete announcement
-router.delete('/announcements/:id', async (req: Request, res: Response) => {
-  try {
-    const announcementId = req.params.id;
-
-    await prisma.announcement.delete({
-      where: {
-        id: announcementId
-      }
-    });
-
+// DELETE /announcements/:id - Remove an announcement permanently
+router.delete(
+  '/announcements/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await prisma.announcement.delete({ where: { id } });
     res.json({ message: 'Announcement deleted successfully' });
+  })
+);
 
-  } catch (error) {
-    console.error('Delete announcement error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
+// -----------------------------------------------------------------------------
 // Horse Management
 
-// Get all horses
-router.get('/horses', async (req: Request, res: Response) => {
-  try {
-    const horses = await prisma.horse.findMany({
-      orderBy: {
-        name: 'asc'
-      }
-    });
+// GET /horses - List all horses sorted alphabetically
+router.get(
+  '/horses',
+  asyncHandler(async (req: Request, res: Response) => {
+    const horses = await prisma.horse.findMany({ orderBy: { name: 'asc' } });
+    res.json({ horses });
+  })
+);
 
-    res.json({
-      horses: horses
-    });
-
-  } catch (error) {
-    console.error('Get horses error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Create new horse
-router.post('/horses', async (req: Request, res: Response) => {
-  try {
-    const { name, breed, dob, sex, temperament, weight, height, bio } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: 'Horse name is required' });
-    }
-
+// POST /horses - Create a new horse record
+router.post(
+  '/horses',
+  asyncHandler(async (req: Request, res: Response) => {
+    const payload = horseSchema.parse(req.body);
     const horse = await prisma.horse.create({
       data: {
-        name,
-        breed,
-        dob: dob ? new Date(dob) : null,
-        sex,
-        temperament,
-        weight: weight ? parseFloat(weight) : null,
-        height: height ? parseFloat(height) : null,
-        bio,
-        isActive: true
-      }
+        name: payload.name,
+        breed: payload.breed,
+        dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth) : null,
+        sex: payload.sex,
+        temperament: payload.temperament as any || null,
+        weight: payload.weight ? parseFloat(payload.weight) : null,
+        height: payload.height ? parseFloat(payload.height) : null,
+        bio: payload.bio,
+        isActive: payload.isActive ?? true,
+      },
     });
+    res.status(201).json({ message: 'Horse created successfully', data: horse });
+  })
+);
 
-    res.status(201).json({
-      message: 'Horse created successfully',
-      data: horse
-    });
-
-  } catch (error) {
-    console.error('Create horse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Update horse
-router.put('/horses/:id', async (req: Request, res: Response) => {
-  try {
+// PUT /horses/:id - Update a horse record
+router.put(
+  '/horses/:id',
+  asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, breed, dob, sex, temperament, weight, height, bio, isActive } = req.body;
-
+    const payload = horseSchema.parse(req.body);
     const horse = await prisma.horse.update({
       where: { id },
       data: {
-        name,
-        breed,
-        dob: dob ? new Date(dob) : null,
-        sex,
-        temperament,
-        weight: weight ? parseFloat(weight) : null,
-        height: height ? parseFloat(height) : null,
-        bio,
-        isActive
-      }
+        name: payload.name,
+        breed: payload.breed,
+        dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth) : null,
+        sex: payload.sex,
+        temperament: payload.temperament as any || null,
+        weight: payload.weight ? parseFloat(payload.weight) : null,
+        height: payload.height ? parseFloat(payload.height) : null,
+        bio: payload.bio,
+        isActive: payload.isActive,
+      },
     });
+    res.json({ message: 'Horse updated successfully', data: horse });
+  })
+);
 
-    res.json({
-      message: 'Horse updated successfully',
-      data: horse
-    });
-
-  } catch (error) {
-    console.error('Update horse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Delete horse
-router.delete('/horses/:id', async (req: Request, res: Response) => {
-  try {
+// DELETE /horses/:id - Remove a horse record
+router.delete(
+  '/horses/:id',
+  asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-
-    await prisma.horse.delete({
-      where: { id }
-    });
-
-    res.json({
-      message: 'Horse deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Delete horse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+    await prisma.horse.delete({ where: { id } });
+    res.json({ message: 'Horse deleted successfully' });
+  })
+);
 
 export default router;
